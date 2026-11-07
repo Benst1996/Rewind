@@ -1,8 +1,31 @@
 .thumb
 
+@ Saves details about key item used (chests/doors).
+@
+@ Hooked at 0x2F510, ExecKeyItem.
+.global REW_hookLootChestReceive5
+REW_hookLootChestReceive5:
+push    {r4-r5, r14}
+
+@ Track key item used.
+ldr   r3, =REW_keyItemUsed
+bl    GOTO_R3
+
+@ Vanilla, overwritten by hook.
+ldr   r4, =gActionData
+ldrb  r0, [r4, #0xC]
+ldr   r3, =GetUnit
+bl    GOTO_R3
+ldr   r3, =0x802F51B
+
+@ Return.
+GOTO_R3:
+bx    r3
+
 @ Saves details about obtained item from
 @ - looting enemy that just died or
-@ - opening a chest.
+@ - opening a chest or
+@ - event.
 @
 @ This hook covers cases where the unit's inventory is not full.
 @
@@ -11,7 +34,7 @@
 @   r1, r5: item
 @   r2, r6: Proc*
 @
-@ Hooked at 0x1E0A4.
+@ Hooked at 0x1E0A2.
 .global REW_hookLootChestReceive1
 REW_hookLootChestReceive1:
 
@@ -26,6 +49,7 @@ beq   L1
   @ Item was added to unit's inventory.
   @ Track this in rewind data.
   mov   r0, #0x7                @ REW_ITEM_INVENTORYNOTFULL.
+  mov   r1, #0x0
   ldr   r3, =REW_itemObtained
   bl    GOTO_R3
   
@@ -37,8 +61,6 @@ beq   L1
 @ decides which item to send to convoy/discard.
 L1:
 ldr   r3, =0x801E0AD
-
-GOTO_R3:
 bx    r3
 
 @ Saves details about obtained item from

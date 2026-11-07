@@ -14,8 +14,10 @@ PUSH
 
   // Track item inventory changes.
   
-    // Item obtained through loot drop or chest.
+    // Item obtained through loot-drop, event or chest.
     /*
+    ORG 0x2F510   // Track key item used.
+      jumpToHack(REW_hookLootChestReceive5)
     ORG 0x1E0A2       // Inventory may or may not be full.
       SHORT 0x0       // NOP
       jumpToHack(REW_hookLootChestReceive1)
@@ -72,4 +74,4 @@ PUSH
 POP
 
 ALIGN 4; #include "loadUnit.lyn.event"
-//ALIGN 4; #include "itemDrop.lyn.event"
+ALIGN 4; #include "itemDrop.lyn.event"

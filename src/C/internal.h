@@ -126,6 +126,7 @@ struct REW_UnitDefData {
 } __attribute__((packed));
 
 void REW_clearRewindSeq(struct REW_RewindSequence* sequence);
+int REW_isSequenceEmpty(struct REW_RewindSequence* sequence);
 struct REW_RewindEntry* REW_createSeqEntry(struct REW_RewindSequence* seq);
 struct REW_RewindSequence* REW_nextSequence(struct REW_RewindSequence* sequence);
 struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence);
@@ -136,7 +137,6 @@ void REW_alignSequence(struct REW_RewindSequence* sequence);
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence);
 int REW_isRedoAvailable(struct REW_RewindSequence* sequence);
-int REW_isUnitAction(int diffType);
 
 void REW_getCoordinateDifference(struct REW_UnitChangeData* unitChangeData, u16 size, s8* xDiff, s8* yDiff);
 u8 REW_getUnitID(struct REW_UnitData* unitData, u16 size, u8 mode);

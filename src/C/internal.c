@@ -6,6 +6,14 @@ void REW_clearRewindSeq(struct REW_RewindSequence* sequence) {
   sequence->size = 0;
 }
 
+// Returns true if sequence is empty.
+// Returns false, otherwise.
+int REW_isSequenceEmpty(struct REW_RewindSequence* sequence) {
+  if (sequence->size == 0)
+    return true;
+  return false;
+}
+
 // 'creates' a new rewindEntry by returning the
 //  address of the end of the given sequence.
 struct REW_RewindEntry* REW_createSeqEntry(struct REW_RewindSequence* seq) {
@@ -99,14 +107,6 @@ int REW_isRedoAvailable(struct REW_RewindSequence* sequence) {
   if (REW_rewindBuffer->end <= sequence)
     return false;
   return true;
-}
-
-// Return if entry's difftype corresponds to an action taken by a unit.
-int REW_isUnitAction(int diffType) {
-  
-  // TODO
-  
-  return 0;
 }
 
 // Searches unitData for X and Y coordinate difference
