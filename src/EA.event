@@ -38,6 +38,12 @@ PUSH
   ORG 0xAB1CA         // Adjust the save scroll.
   SHORT 0x322E
   
+  // Disable the option to item -> trade -> unit.
+  // This makes tracking inventory changes easier.
+  // Players can still trade via trade -> unit -> item.
+  ORG 0x59C608
+    WORD 0x804F451      // MenuAlwaysNotShown.
+  
 POP
 
 // TODO, temporary fixed rewind buffer instance.

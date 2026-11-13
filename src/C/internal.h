@@ -20,37 +20,32 @@ enum {
   REW_TRAP_MAX_COUNT = 64,
   REW_MAX_SIMULTANEOUS_SUPPORT_COUNT = 5,
   
+  // Size limit identifiers.
+  REW_SEQUENCE_LIMIT_REACHED = 0xFFFF,
+  REW_BUFFER_LIMIT_REACHED = 0xFFFF,
+  
   // Entry & data sizes. Keep having to change these
   // so I made them into an enum.
   REW_BUFFER_BASESIZE = 8,
   REW_SEQUENCE_BASESIZE = 4,
   REW_ENTRY_BASESIZE = 4,
-  REW_ENTRY_PHASECHANGEDATA_BASESIZE = 0,
+  
   REW_ENTRY_UNITDATA_BASESIZE = 2,
   REW_ENTRY_OBSTACLE_BASESIZE = 4,
   REW_ENTRY_UNITDEFDATA_SIZE = 3,
-  REW_PHASECHANGEBUFFER_ENTRYSIZE = 8,      // Preferably a power of 2.
   
   // diffTypes. First 0x3F values are reserved for actions,
   // such as UNIT_ACTION_COMBAT as given in FEClib's action.h.
-  REW_ACTION_PHASECHANGE =    0x40,
-  REW_ACTION_BREAK =          0x41,
-  REW_CONSEQ_UNITCHANGE =     0x42,
-  REW_CONSEQ_UNITLOAD_INIT =  0x43,
-  REW_CONSEQ_UNITLOAD_FINAL = 0x44,
-  REW_CONSEQ_ITEMOBTAINED =   0x45,
-  
-  // REW_RewindPhaseChangeData.flags.
-  REW_PHASE_PRE_ALLY =    0x0,
-  REW_PHASE_PRE_NPC =     0x1,
-  REW_PHASE_PRE_ENEMY =   0x2,
-  REW_PHASE_PRE_MASK =    0x3,
-  REW_PHASE_POST_ALLY =   0x0,
-  REW_PHASE_POST_NPC =    0x4,
-  REW_PHASE_POST_ENEMY =  0x8,
-  REW_PHASE_POST_MASK =   0xC,
-  REW_PHASECHANGE_TURNINCR =  0x10,
-  REW_PHASECHANGE_SKIPPHASE = 0x20,
+  REW_ACTION_PHASECHANGE =         0x40,
+  REW_ACTION_BREAK =               0x41,
+  REW_CONSEQ_UNITCHANGE =          0x42,
+  REW_CONSEQ_UNITLOAD_INIT =       0x43,
+  REW_CONSEQ_UNITLOAD_FINAL =      0x44,
+  REW_CONSEQ_INVENTORYREORDER =    0x45,
+  REW_CONSEQ_ITEMOBTAINED_UNIT =   0x46,
+  REW_CONSEQ_ITEMREMOVED_UNIT =    0x47,
+  REW_CONSEQ_ITEMOBTAINED_SUPPLY = 0x48,
+  REW_CONSEQ_ITEMREMOVED_SUPPLY =  0x49,
   
   // Obstacle flags.
   REW_OBSTACLE_SNAG = 0x1,
@@ -133,7 +128,7 @@ struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence)
 struct REW_RewindEntry* REW_nextEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_prevEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq);
-void REW_alignSequence(struct REW_RewindSequence* sequence);
+void REW_addRewindEntrySize(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, int size);
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence);
 int REW_isRedoAvailable(struct REW_RewindSequence* sequence);

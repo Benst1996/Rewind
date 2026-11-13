@@ -13,3 +13,4 @@ Loads of things! I'll write down specific things I'm worried I'll otherwise forg
   - Units dying (in combat or otherwise)
   - Test undo/redo on fogmap. Should probably use some generic bmMap refreshing function for unitmap, fogmap, sprites, etc.
   - How does rewind work during tutorials? Check this after implementing rewind for every event & action.
+  - Use CheckInLinkArena to disable functionality in link arena.

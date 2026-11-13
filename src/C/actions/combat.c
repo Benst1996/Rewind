@@ -486,11 +486,9 @@ void REW_storeCombatData(struct Unit* unit,
     }
   }
   
-  // Set entry and corresponding sequence sizes.
-  rewindEntry->size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE + changeIdx * 2;
-  if (rewindSeq->size == 0) { rewindSeq->size = REW_SEQUENCE_BASESIZE; }
-  rewindSeq->size += rewindEntry->size;
-  REW_alignSequence(rewindSeq);
+  // Set entry size & update sequence size.
+  REW_addRewindEntrySize(rewindSeq, rewindEntry,
+                         REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE + changeIdx * 2);
 }
 
 // Store unit's changes resulting from combat in which the unit died.
@@ -520,6 +518,7 @@ void REW_storeCombatDataDead(struct Unit* unit,
   struct UnitUsageStats bwlPost;
   int i, unitSupporterIndex, unitSupporterCount;
   int changeIdx = 0;
+  int size = 0;
   u8 diff;
   struct Unit referenceUnit;
   struct Unit* supporterUnit;
@@ -561,10 +560,8 @@ void REW_storeCombatDataDead(struct Unit* unit,
     referenceUnit.state &= ~US_IN_BALLISTA;
     referenceUnit.ballistaIndex = 0;
     
-    // Set initial entry size.
-    rewindEntry->size = REW_ENTRY_BASESIZE +
-                        unitSupporterCount +
-                        REW_ENTRY_UNITDATA_BASESIZE;
+    // Determine initial entry size.
+    size = REW_ENTRY_BASESIZE + unitSupporterCount + REW_ENTRY_UNITDATA_BASESIZE;
     
   } else {
     
@@ -592,9 +589,8 @@ void REW_storeCombatDataDead(struct Unit* unit,
                                             // Unit might be loaded in different slot, that's okay.
     referenceUnit.pMapSpriteHandle = unit->pMapSpriteHandle;   // Need a new one when reloading.
     
-    // Set initial entry size.
-    rewindEntry->size = REW_ENTRY_BASESIZE +
-                        REW_ENTRY_UNITDEFDATA_SIZE;
+    // Determine initial entry size.
+    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDEFDATA_SIZE;
   }
   
   // Now store changes of unit.
@@ -637,11 +633,9 @@ void REW_storeCombatDataDead(struct Unit* unit,
     }
   }
   
-  // Finish setting entry size and set corresponding sequence size.
-  rewindEntry->size += changeIdx * 2;
-  if (rewindSeq->size == 0) { rewindSeq->size = REW_SEQUENCE_BASESIZE; }
-  rewindSeq->size += rewindEntry->size;
-  REW_alignSequence(rewindSeq);
+  // Set entry size & update sequence size.
+  size += changeIdx * 2;
+  REW_addRewindEntrySize(rewindSeq, rewindEntry, size);
 }
 
 // Store changes resulting from a combat action.
@@ -650,9 +644,6 @@ void REW_actionCombat() {
   struct REW_RewindEntry* rewindEntry;
   struct Unit* actor  = GetUnit(gBattleActor.unit.index);
   struct Unit* target = GetUnit(gBattleTarget.unit.index);
-  
-  // Clear rewind sequence.
-  REW_clearRewindSeq(rewindSeq);
   
   // Actor.
   rewindEntry = REW_createSeqEntry(rewindSeq);
@@ -734,16 +725,13 @@ void REW_actionCombat() {
     if (gBmMapTerrain[gBattleTarget.unit.yPos][gBattleTarget.unit.xPos] == REW_SNAG_ID)
       rewindEntry->flags |= REW_OBSTACLE_SNAG;
     
-    rewindEntry->size = REW_ENTRY_BASESIZE;
-    
     struct Trap* trapData = (struct Trap*)rewindEntry->data;
     trapData->xPos = trap->xPos;
     trapData->yPos = trap->yPos;
     trapData->type = trap->type;
     trapData->extra = gBattleTarget.unit.curHP - trap->extra;
     
-    rewindEntry->size += REW_ENTRY_OBSTACLE_BASESIZE;
-    rewindSeq->size += rewindEntry->size;
-    REW_alignSequence(rewindSeq);
+    // Set entry size & update sequence size.
+    REW_addRewindEntrySize(rewindSeq, rewindEntry, REW_ENTRY_BASESIZE + REW_ENTRY_OBSTACLE_BASESIZE);
   }
 }

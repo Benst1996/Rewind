@@ -3,7 +3,6 @@
 #include "gbafe.h"
 #include "../internal.h"
 
-// Custom.
 void REW_undoObstacleCombat(struct REW_RewindEntry* entry);
 void REW_redoObstacleCombat(struct REW_RewindEntry* entry);
 void REW_undoCombat(struct REW_RewindEntry* entry);

@@ -36,9 +36,29 @@ void REW_undo(struct REW_RewindSequence* sequence) {
         REW_undoLoadUnit(entry);
         break;
       
-      // Item obtained (Steal / loot defeated enemy / loot chest).
-      case REW_CONSEQ_ITEMOBTAINED:
-        //REW_undoItemObtained(sequence, entry);
+      // Item obtained by unit.
+      case REW_CONSEQ_ITEMOBTAINED_UNIT:
+        REW_undoItemObtainedUnit(entry);
+        break;
+      
+      // Item removed from unit.
+      case REW_CONSEQ_ITEMREMOVED_UNIT:
+        REW_undoItemRemovedUnit(entry);
+        break;
+      
+      // Item sent to supply.
+      case REW_CONSEQ_ITEMOBTAINED_SUPPLY:
+        REW_undoItemObtainedSupply(entry);
+        break;
+      
+      // Item removed from supply.
+      case REW_CONSEQ_ITEMREMOVED_SUPPLY:
+        REW_undoItemRemovedSupply(entry);
+        break;
+      
+      // Inventory reorder (equipping/discarding/obtaining an item).
+      case REW_CONSEQ_INVENTORYREORDER:
+        REW_doInventoryReorder(entry, true);
         break;
       
       default:
@@ -78,9 +98,29 @@ void REW_redo(struct REW_RewindSequence* sequence) {
         REW_redoLoadUnit(entry);
         break;
       
-      // Item obtained (Steal / loot defeated enemy / loot chest).
-      case REW_CONSEQ_ITEMOBTAINED:
-        //REW_redoItemObtained(sequence, entry);
+      // Item obtained by unit.
+      case REW_CONSEQ_ITEMOBTAINED_UNIT:
+        REW_redoItemObtainedUnit(entry);
+        break;
+      
+      // Item removed from unit.
+      case REW_CONSEQ_ITEMREMOVED_UNIT:
+        REW_redoItemRemovedUnit(entry);
+        break;
+      
+      // Item sent to supply.
+      case REW_CONSEQ_ITEMOBTAINED_SUPPLY:
+        REW_redoItemObtainedSupply(entry);
+        break;
+      
+      // Item removed from supply.
+      case REW_CONSEQ_ITEMREMOVED_SUPPLY:
+        REW_redoItemRemovedSupply(entry);
+        break;
+      
+      // Inventory reorder (equipping/discarding/obtaining an item).
+      case REW_CONSEQ_INVENTORYREORDER:
+        REW_doInventoryReorder(entry, false);
         break;
       
       default:

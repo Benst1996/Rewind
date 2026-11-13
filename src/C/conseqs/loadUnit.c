@@ -32,7 +32,6 @@ void REW_conseqInitUnit(struct Unit* unit, struct UnitDefinition* unitDef) {
   struct REW_RewindEntry* entry = REW_createSeqEntry(REW_curSequence);
   entry->diffType = REW_CONSEQ_UNITLOAD_INIT;
   entry->flags = unit->index;
-  entry->size = REW_ENTRY_BASESIZE + REW_UNITDEFSIZE;
   
   // Setup unit definition data.
   struct UnitDefinition* unitDefData = (struct UnitDefinition*)entry->data;
@@ -40,9 +39,8 @@ void REW_conseqInitUnit(struct Unit* unit, struct UnitDefinition* unitDef) {
   unitDefData->xPosition = unit->xPos;
   unitDefData->yPosition = unit->yPos;
   
-  // Add entry's size to sequence's size.
-  REW_curSequence->size += entry->size;
-  REW_alignSequence(REW_curSequence);
+  // Set entry size & update sequence size.
+  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_UNITDEFSIZE);
 }
 
 // Finalize loaded units' positions in rewind sequence.

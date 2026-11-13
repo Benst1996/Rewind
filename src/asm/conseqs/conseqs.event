@@ -14,6 +14,17 @@ PUSH
 
   // Track item inventory changes.
   
+    // Unit inventory reordering.
+    // Whenever a unit equips an item
+    // we need to track how the inventory is reordered.
+    ORG 0x16BC0
+      jumpToHack(REW_hookEquipItem)
+    
+    // Track whenever a unit obtains an item.
+    ORG 0x17948
+      jumpToHack(REW_hookItemObtained)
+    
+  
     // Item obtained through loot-drop, event or chest.
     /*
     ORG 0x2F510   // Track key item used.

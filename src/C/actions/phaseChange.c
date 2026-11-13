@@ -69,7 +69,7 @@ u8 REW_nextPhase(u8 phase, u8* turn, u8* skip) {
 // Track greyed out units.
 void REW_actionPhaseChangeStart() {
   u8 nextPhase, turnIncr = 0, skip = false;
-  int counter = 0, unitID, unitIDCurrFaction;
+  int counter = 0, size = 0, unitID, unitIDCurrFaction;
   struct Unit* unit;
   struct REW_RewindEntry* entry;
   
@@ -77,7 +77,7 @@ void REW_actionPhaseChangeStart() {
   nextPhase = REW_nextPhase(gPlaySt.faction, &turnIncr, &skip);
   entry = REW_createSeqEntry(REW_curSequence);
   entry->diffType = REW_ACTION_PHASECHANGE;
-  entry->size = REW_ENTRY_BASESIZE + REW_ENTRY_PHASECHANGEDATA_BASESIZE;
+  size = REW_ENTRY_BASESIZE + REW_ENTRY_PHASECHANGEDATA_BASESIZE;
   
   // Setup flags.
   entry->flags = 0;
@@ -93,22 +93,21 @@ void REW_actionPhaseChangeStart() {
     if (UNIT_IS_VALID(unit)) {
       if (unit->state & US_UNSELECTABLE) {
         entry->data[counter] = unitIDCurrFaction;
-        entry->size++;
+        size++;
         counter++;
       }
     }
   }
   
-  // Set sequence size.
-  REW_curSequence->size += entry->size;
-  REW_alignSequence(REW_curSequence);
+  // Set entry size & update sequence size.
+  REW_addRewindEntrySize(REW_curSequence, entry, size);
 }
 
 // Track support exp gains.
 // Mimics ProcessTurnSupportExp 0x8028434,
 // but adds exp gains to rewind data.
 void REW_actionPhaseChangeSuppports() {
-  int i, j, jMax, k, exp;
+  int i, j, size, jMax, k, exp;
   struct REW_RewindEntry* entry;
   struct REW_UnitData* unitData;
 
@@ -132,7 +131,7 @@ void REW_actionPhaseChangeSuppports() {
     
     // Track support exp gains, if unit gets any.
     entry = REW_createSeqEntry(REW_curSequence);
-    entry->size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
+    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
     unitData = (struct REW_UnitData*)entry->data;
     k = 0;
     jMax = GetUnitSupporterCount(unit);
@@ -172,14 +171,14 @@ void REW_actionPhaseChangeSuppports() {
         if (exp) {
           unitData->unitChangeData[k].offs = 0x32 + j;
           unitData->unitChangeData[k].diff = exp;
-          entry->size += 2;
+          size += 2;
           k++;
         }
       }
     }
     
     // If any support exp was gained, add entry to rewind data.
-    if (entry->size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
+    if (size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
       
       // Finish up rewindentry setup.
       entry->diffType = REW_CONSEQ_UNITCHANGE;
@@ -187,9 +186,8 @@ void REW_actionPhaseChangeSuppports() {
       unitData->x = unit->xPos;
       unitData->y = unit->yPos;
       
-      // Adjust sequence size.
-      REW_curSequence->size += entry->size;
-      REW_alignSequence(REW_curSequence);
+      // Set entry size & update sequence size.
+      REW_addRewindEntrySize(REW_curSequence, entry, size);
     }
   }
 }
@@ -241,7 +239,7 @@ void REW_actionPhaseChangeTrackStatus() {
 // REW_actionPhaseChangeTrackStatus if these
 // values changed.
 void REW_actionPhaseChangeRecordStatus() {
-  int i, j, diff, offs;
+  int i, j, size = 0, diff, offs;
   u8* unit;
   struct Unit* unit2;
   struct REW_RewindEntry* entry;
@@ -258,7 +256,7 @@ void REW_actionPhaseChangeRecordStatus() {
     
     // Add changed unit data to new rewind entry.
     entry = REW_createSeqEntry(REW_curSequence);
-    entry->size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
+    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
     unitData = (struct REW_UnitData*)entry->data;
     j = 0;
     for (i = 0; i < REW_PHASECHANGEBUFFER_ENTRYSIZE; i += 2) {
@@ -268,13 +266,13 @@ void REW_actionPhaseChangeRecordStatus() {
       if (diff) {
         unitData->unitChangeData[j].offs = phaseChangeBuffer[offs];
         unitData->unitChangeData[j].diff = diff;
-        entry->size += 2;
+        size += 2;
         j++;
       }
     }
     
     // If any unit data changed, add entry to rewind data.
-    if (entry->size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
+    if (size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
       
       // Finish up rewindentry setup.
       entry->diffType = REW_CONSEQ_UNITCHANGE;
@@ -282,9 +280,8 @@ void REW_actionPhaseChangeRecordStatus() {
       unitData->x = unit2->xPos;
       unitData->y = unit2->yPos;
       
-      // Adjust sequence size.
-      REW_curSequence->size += entry->size;
-      REW_alignSequence(REW_curSequence);
+      // Set entry size & update sequence size.
+      REW_addRewindEntrySize(REW_curSequence, entry, size);
     }
   }
 }

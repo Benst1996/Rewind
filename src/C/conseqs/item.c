@@ -1,219 +1,225 @@
 #include <stdio.h>
 #include "item.h"
 
-/*
-// Undo item obtained consequence.
-void REW_undoItemObtained(struct REW_RewindSequence* sequence, struct REW_RewindEntry* entry) {
-  struct REW_RewindEntry* unitRewindEntry = sequence->entry[0];
+// Undo or redo a reordering of a unit's inventory.
+// bool undo is true if undoing the reorder, false if redoing the reorder.
+void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo) {
+  struct REW_InventoryReorder* inventoryReorder;
+  struct REW_InventoryReorderFlags* inventoryReorderFlags;
+  s8 unitID;
+  struct Unit* unit;
+  u8 inventorySlotAvailabilityMask = 0;
+  u16 items[UNIT_ITEM_COUNT];
+  int i, j, k, l;
   
+  inventoryReorder = (struct REW_InventoryReorder*)entry->data;
+  inventoryReorderFlags = (struct REW_InventoryReorderFlags*)&entry->flags;
   
-  while (!REW_isUnitAction(unitRewindEntry->diffType)) {
-    
-    unitRewindEntry = REW_nextEntry(sequence, unitRewindEntry);
+  // Sanity checks. These values will not be accepted.
+  if (inventoryReorderFlags->item1Pos > 4 ||
+      inventoryReorderFlags->item3Pos > 2)
+    return;
   
-  }
+  // Find unit.
+  unitID = gBmMapUnit[inventoryReorder->y][inventoryReorder->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
   
+  // Prepare item location array.
+  int itemPositions[UNIT_ITEM_COUNT] = {inventoryReorderFlags->item1Pos,
+                                        inventoryReorderFlags->item2Pos,
+                                        inventoryReorderFlags->item3Pos,
+                                        inventoryReorderFlags->item4Pos,
+                                        0};
   
-  switch(entry->flags) {
-    
-    case REW_ITEM_INVENTORYNOTFULL:
+  // Determine new positions of items.
+  for (l = 0; l < UNIT_ITEM_COUNT; l++) {
+  
+    // Item l.
+    i = 0;
+    j = itemPositions[l];
+    k = 1;
+    while (true) {
       
-      break;
-    
-    case REW_ITEM_CONVOY_DIFFERENTITEM:
+      if (!(inventorySlotAvailabilityMask & k)) {
+        
+        if (j == 0)
+          break;      // Found the inventory slot.
+        else
+          j--;        // Not this inventory slot.
+      }
       
-      break;
-    
-    case REW_ITEM_CONVOY_OBTAINEDITEM:
-      
-      break;
-    
-    case REW_ITEM_DISCARD_DIFFERENTITEM:
-      
-      break;
-    
-    default:
-  }
-  
-}
-
-// Redo item obtained consequence.
-void REW_redoItemObtained(struct REW_RewindSequence* sequence, struct REW_RewindEntry* entry) {
-  
-}
-*/
-
-// Tracks key item used for opening chest/doors.
-// TODO, doors.
-void REW_keyItemUsed() {
-  struct REW_RewindSequence* rewindSeq = REW_curSequence;
-  struct REW_RewindEntry* rewindEntry;
-  struct REW_chestLootData* chestLootData;
-  struct Unit* unit = GetUnit(gActionData.subjectIndex);
-  u8 flags = 0;
-  u16 keyItem = unit->items[gActionData.itemSlotIndex];
-  
-  // Create new entry for chest action.
-  rewindEntry = REW_createSeqEntry(rewindSeq);
-  rewindEntry->diffType = gActionData.unitActionType;
-  chestLootData = (struct REW_chestLootData*)rewindEntry->data;
-  
-  // Setup flags accordingly:
-  // - 3 bits: inventory slot of key item (5 values).
-  // - 2 bits: key item type in case key item breaks.
-  
-  // - Inventory slot of key item.
-  rewindEntry->flags = gActionData.itemSlotIndex;
-  
-  // - Key item type.
-  if (GetItemUses(keyItem) > 1) {
-    flags = REW_ITEM_NOTBROKEN;
-  } else {
-    switch (GetItemIndex(keyItem)) {
-      
-      // 1-use chest key.
-      case (ITEM_CHESTKEY):
-        flags = REW_ITEM_CHESTKEY;
-        break;
-      
-      // 5-use chest key.
-      case (ITEM_CHESTKEY_BUNDLE):
-        flags = REW_ITEM_CHESTKEY_BUNDLE;
-        break;
-      
-      // Lockpick.
-      case (ITEM_LOCKPICK):
-        flags = REW_ITEM_LOCKPICK;
-        break;
-      
+      k <<= 1;
+      i++;
     }
+    
+    inventorySlotAvailabilityMask |= k;
+    
+    if (undo)
+      items[l] = unit->items[i];
+    else // Redo.
+      items[i] = unit->items[l];
   }
-  rewindEntry->flags |= (flags << 3);
   
-  // Store unit's X and Y difference after action.
-  chestLootData->xDiff = unit->xPos - gActiveUnitMoveOrigin.x;
-  chestLootData->yDiff = unit->yPos - gActiveUnitMoveOrigin.y;
-  
-  // Setup rewind entry size.
-  rewindEntry->size = REW_ENTRY_BASESIZE + REW_CHESTLOOTDATA_BASESIZE;
-  
-  // Default assumption is that obtained item is discarded.
-  // If anything else happens, REW_itemObtained will change these flags.
-  chestLootData->flags = REW_ITEM_DISCARD_OBTAINEDITEM;
-  
-  // Adjust sequence size.
-  rewindSeq->size += rewindEntry->size;
-  REW_alignSequence(rewindSeq);
+  // Reorder unit's inventory.
+  for (l = 0; l < UNIT_ITEM_COUNT; l++)
+    unit->items[l] = items[l];
 }
 
+// Undo unit obtaining an item.
+void REW_undoItemObtainedUnit(struct REW_RewindEntry* entry) {
+  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  s8 unitID;
+  struct Unit* unit;
+  
+  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
+  
+  // Find unit.
+  unitID = gBmMapUnit[itemObtainedUnit->y][itemObtainedUnit->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // Remove last item in unit's inventory.
+  unit->items[GetUnitItemCount(unit) - 1] = 0;
+}
 
-// Tracks item obtained through
-//  - looting defeated enemy,
-//  - looting a chest,
-//  - stealing from an enemy.
-// argument kind determines how the item was obtained
-// and what action should be taken.
-void REW_itemObtained(u8 kind, s8 inventorySlot) {
-  struct REW_RewindSequence* rewindSeq = REW_curSequence;
-  struct REW_RewindEntry* rewindEntry;
-  struct REW_chestLootData* chestLootData;
-  
-  // Looting a chest.
-  if (!REW_isSequenceEmpty(rewindSeq) &&
-      rewindSeq->entry[0].diffType == UNIT_ACTION_CHEST) {
-    
-    // Setup vars.
-    rewindEntry = rewindSeq->entry;
-    chestLootData = (struct REW_chestLootData*)rewindEntry->data;
-    
-    // Store flags indicating if item was discarded/sent to convoy.
-    chestLootData->flags = kind | inventorySlot;
-    
-    // If item discarded/sent to convoy is not obtained item,
-    // Store item that was discarded/sent to convoy.
-    if (kind != REW_ITEM_INVENTORYNOTFULL &&
-        inventorySlot != 5) {
-      
-      // Store item that was discarded/sent to convoy.
-      chestLootData->replaceditem = gActiveUnit->items[inventorySlot];
-      
-      // Adjust sequence size.
-      rewindEntry->size += 2;
-      rewindSeq->size += 2;
-      REW_alignSequence(rewindSeq);
-    }
-  }
-  
-/*
-  struct REW_RewindSequence* rewindSeq = REW_curSequence;
-  struct REW_RewindEntry* rewindEntry;
-  
-  if (gActionData.unitActionType == UNIT_ACTION_CHEST) {
-    rewindEntry = REW_createSeqEntry(rewindSeq);
-    
-    
-  }
+// Undo unit losing an item.
+void REW_undoItemRemovedUnit(struct REW_RewindEntry* entry) { 
 
+}
+
+// Undo item sent to supply.
+void REW_undoItemObtainedSupply(struct REW_RewindEntry* entry) { 
+
+}
+
+// Undo item removed from supply.
+void REW_undoItemRemovedSupply(struct REW_RewindEntry* entry) { 
+
+}
+
+// Redo unit obtaining an item.
+void REW_redoItemObtainedUnit(struct REW_RewindEntry* entry) { 
+  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  s8 unitID;
+  struct Unit* unit;
+  int itemCount;
   
-  // Setup rewindEntry.
-  rewindEntry->diffType = REW_CONSEQ_ITEMOBTAINED;
-  rewindEntry->size = REW_SEQUENCE_BASESIZE;
+  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
   
-  switch(kind) {
-    
-    // Inventory not full, nothing discarded/sent to convoy.
-    case REW_ITEM_INVENTORYNOTFULL:
-      
-      // Setup flags.
-      rewindEntry->flags = REW_ITEM_INVENTORYNOTFULL;
-      
-      break;
-    
-    // Inventory full, send different item to convoy.
-    case REW_ITEM_CONVOY_DIFFERENTITEM:
-      
-      // Setup flags.
-      rewindEntry->flags = (u8)inventorySlot;
-      rewindEntry->flags |= REW_ITEM_CONVOY_DIFFERENTITEM;
-      
-      // Save item.
-      ((u16*)(rewindEntry->data))[0] = gActiveUnit->items[inventorySlot];
-      
-      // Add item size to rewindEntry's size.
-      rewindEntry->size += 2;
-      break;
-    
-    // Inventory full, send obtained item to convoy.
-    case REW_ITEM_CONVOY_OBTAINEDITEM:
-      
-      // Setup flags.
-      rewindEntry->flags = (u8)inventorySlot;
-      rewindEntry->flags |= REW_ITEM_CONVOY_OBTAINEDITEM;
-      
-      break;
-    
-    case REW_ITEM_DISCARD_DIFFERENTITEM:
-      
-      // Setup flags.
-      rewindEntry->flags = (u8)inventorySlot;
-      rewindEntry->flags |= REW_ITEM_DISCARD_DIFFERENTITEM;
-      
-      // Save item.
-      ((u16*)(rewindEntry->data))[0] = gActiveUnit->items[inventorySlot];
-      
-      // Add item size to rewindEntry's size.
-      rewindEntry->size += 2;
-      
-      break;
-    
-    // Shouldn't trigger the default.
-    default:
-    
-      // Don't save the rewindEntry.
-      return;
-  }
+  // Find unit.
+  unitID = gBmMapUnit[itemObtainedUnit->y][itemObtainedUnit->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
   
-  rewindSeq->size += rewindEntry->size;
-  REW_alignSequence(rewindSeq);
-  */
+  // Can't re-add item if inventory is full.
+  // We shouldn't get here.
+  itemCount = GetUnitItemCount(unit);
+  if (itemCount >= UNIT_ITEM_COUNT)
+    return;
+  
+  // Add obtained item to unit's inventory.
+  unit->items[itemCount] = itemObtainedUnit->item;
+}
+
+// Redo unit losing an item.
+void REW_redoItemRemovedUnit(struct REW_RewindEntry* entry) { 
+
+}
+
+// Redo item removed from supply.
+void REW_redoItemObtainedSupply(struct REW_RewindEntry* entry) { 
+
+}
+
+// Redo item removed from supply.
+void REW_redoItemRemovedSupply(struct REW_RewindEntry* entry) { 
+
+}
+
+// Track when a unit equips a different item.
+// - itemSlot is the new slot the to-be-equipped item previously occupied.
+void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
+  struct REW_RewindEntry* entry;
+  struct REW_InventoryReorder* inventoryReorder;
+  struct REW_InventoryReorderFlags* inventoryReorderFlags;
+  
+  // Nothing to reorder.
+  if (itemSlot <= 0)
+    return;
+  
+  // Don't track reordering for temporary/copy units.
+  if (GetUnit(unit->index) != unit)
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_INVENTORYREORDER.
+  entry = REW_createSeqEntry(REW_curSequence);
+  entry->diffType = REW_CONSEQ_INVENTORYREORDER;
+  inventoryReorderFlags = (struct REW_InventoryReorderFlags*)&entry->flags;
+  inventoryReorder = (struct REW_InventoryReorder*)entry->data;
+  
+  // Track unit's X and Y.
+  inventoryReorder->x = gActiveUnitMoveOrigin.x;
+  inventoryReorder->y = gActiveUnitMoveOrigin.y;
+  
+  // Setup default inventory order.
+  inventoryReorderFlags->item1Pos = 1;      // This item is guaranteed to have moved one down.
+  inventoryReorderFlags->item2Pos = 0;
+  inventoryReorderFlags->item3Pos = 0;
+  inventoryReorderFlags->item4Pos = 0;
+  
+  // Second item location.
+  if (itemSlot > 1)
+    inventoryReorderFlags->item2Pos = 1;
+  
+  // Third item location.
+  if (itemSlot > 2)
+    inventoryReorderFlags->item3Pos = 1;
+  
+  // Fourth item location.
+  if (itemSlot > 3)
+    inventoryReorderFlags->item4Pos = 1;
+  
+  // Set entry size & update sequence size.
+  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_ENTRY_INVENTORYREORDER_SIZE);
+}
+
+// Track when a unit obtains an item.
+//  - wasItemObtainedSuccessfully is the return value of UnitAddItem
+//    which is called prior to this function. If this value is false
+//    we don't track but return immediately.
+void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtainedSuccessfully) {
+  struct REW_RewindEntry* entry;
+  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  
+  // If we are in preparations nothing to track; Return.
+  if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If item was not obtained (UnitAddItem returned false)
+  // nothing to track; Return.
+  if (!wasItemObtainedSuccessfully)
+    return;
+  
+  // If unit is not valid, return.
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_ITEMOBTAINED_UNIT.
+  entry = REW_createSeqEntry(REW_curSequence);
+  entry->diffType = REW_CONSEQ_ITEMOBTAINED_UNIT;
+  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
+  
+  // Track unit's X and Y.
+  itemObtainedUnit->x = gActiveUnitMoveOrigin.x;
+  itemObtainedUnit->y = gActiveUnitMoveOrigin.y;
+  
+  // Track item.
+  itemObtainedUnit->item = item;
+  
+  // Set entry size & update sequence size.
+  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_CONSEQ_ITEMOBTAINED_UNIT_SIZE);
 }

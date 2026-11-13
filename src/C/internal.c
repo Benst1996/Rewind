@@ -19,7 +19,10 @@ int REW_isSequenceEmpty(struct REW_RewindSequence* sequence) {
 struct REW_RewindEntry* REW_createSeqEntry(struct REW_RewindSequence* seq) {
   
   // Set sequence size to base size if sequence is empty.
-  if (seq->size == 0) { seq->size = REW_SEQUENCE_BASESIZE; }
+  if (REW_isSequenceEmpty(seq)) { seq->size = REW_SEQUENCE_BASESIZE; }
+  
+  // If sequence has no more room...
+  // TODO
   
   // 4 is size of .sizePrev and .size attributes of REW_curSequence.
   u32 addr = (u32)seq + seq->size;
@@ -89,12 +92,22 @@ struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq) {
   return prev;
 }
 
-// Make sure the rewind sequence's size is a multiple of 4.
-// We do this to ensure the next entry is word-aligned.
-void REW_alignSequence(struct REW_RewindSequence* sequence) {
-  int align = sequence->size & 3;
+// Sets rewindEntry's size value and adjusts corresponding sequence (seq) size accordingly.
+void REW_addRewindEntrySize(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, int size) {
+  int align;
+  
+  // Set rewindEntry's size.
+  entry->size = size;
+  
+  // Adjust corresponding sequence's size.
+  if (seq->size == 0) { seq->size = REW_SEQUENCE_BASESIZE; }
+  seq->size += entry->size;
+  
+  // Make sure the rewind sequence's size is a multiple of 4.
+  // We do this to ensure the next entry is word-aligned.
+  align = seq->size & 3;
   if (align)
-    sequence->size += 4 - align;
+    seq->size += 4 - align;
 }
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence) {

@@ -24,8 +24,13 @@ INCFLAGS     := $(foreach dir, $(INCLUDE_DIRS), -I "$(dir)")
 # Here's another person working on a TI machine (calculator?) with the same problem:
 # https://e2e.ti.com/support/microcontrollers/arm-based-microcontrollers-group/arm-based-microcontrollers/f/arm-based-microcontrollers-forum/1367312/mspm0g3507-undefined-__gnu_thumb1_case_uhi-when-building-with-ti_arm_clang-and-linking-to-precombiled-library-built-with-gnu-toolchain
 # Answer also suggests switch statement optimisation being culpable.
+#
+# We're using -fno-tree-loop-distribute-patterns to avoid gcc calling memcpy which is unavailable.
+# Solution found here:
+#
+# https://stackoverflow.com/a/33818680
 ARCH   := -mcpu=arm7tdmi -mthumb -mthumb-interwork
-CFLAGS := $(ARCH)$(INCFLAGS) -Wall -O2 -mtune=arm7tdmi -mlong-calls
+CFLAGS := $(ARCH)$(INCFLAGS) -Wall -O2 -mtune=arm7tdmi -mlong-calls -fno-tree-loop-distribute-patterns
 
 # lyn reference object
 LYNREF := C:/FE-DecompLib/reference/FE8UDecomp.o

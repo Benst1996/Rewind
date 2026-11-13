@@ -34,12 +34,14 @@ PUSH
   
 POP
 
-// Save space size for rewind.
-#define REW_rewindSize 0x1D40
+// These two can consume up to 0x1DC0 save space (as cleared up in ExModularSave.event).
+// Their values need to add up to at most 0x1DC0.
+  // Game can save before action has completed.
+  // This is used to save partial actions.
+  #define REW_curSequenceSize 0x268
 
-// Game can save before action has completed.
-// This is used to save partial actions.
-#define REW_curSequenceSize 0x80
+  // Save space size for rewind.
+  #define REW_rewindSize 0x1B58
 
 #include "txt/txt.event"
 #include "src/EA.event"
