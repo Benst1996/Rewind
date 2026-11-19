@@ -8,35 +8,115 @@ void REW_clearRewindSeq(struct REW_RewindSequence* sequence) {
 
 // Returns true if sequence is empty.
 // Returns false, otherwise.
-int REW_isSequenceEmpty(struct REW_RewindSequence* sequence) {
-  if (sequence->size == 0)
-    return true;
-  return false;
+bool REW_isSequenceEmpty(struct REW_RewindSequence* sequence) {
+  return (sequence->size == 0);
 }
 
-// 'creates' a new rewindEntry by returning the
-//  address of the end of the given sequence.
-struct REW_RewindEntry* REW_createSeqEntry(struct REW_RewindSequence* seq) {
+// Adds a new rewindEntry to the rewindSequence, REW_curSequence.
+// Returns pointer to new rewindEntry or
+// NULL if no more space is available in the rewindSequence.
+// - size argument is additional size to add to rewindEntry.
+struct REW_RewindEntry* REW_mallocNewRewindEntry(u16 size) {
+  struct REW_RewindSequence* seq = REW_curSequence;
+  struct REW_RewindEntry* entry;
   
-  // Set sequence size to base size if sequence is empty.
-  if (REW_isSequenceEmpty(seq)) { seq->size = REW_SEQUENCE_BASESIZE; }
+  // If rewindSequence was marked as not fiting into allocated RAM anymore,
+  // return NULL.
+  if (seq->size == REW_SEQUENCE_LIMIT_REACHED)
+    return NULL;
   
-  // If sequence has no more room...
-  // TODO
+  // If adding new entry makes rewindSequence not fit into allocated RAM anymore,
+  // mark rewindSequence for ignoring and return NULL.
+  if ((seq->size + REW_ENTRY_BASESIZE + size) > (u16)(u32)(&REW_curSequenceMaxSize)) {
+    seq->size = REW_SEQUENCE_LIMIT_REACHED;
+    return NULL;
+  }
   
-  // 4 is size of .sizePrev and .size attributes of REW_curSequence.
-  u32 addr = (u32)seq + seq->size;
-  return (struct REW_RewindEntry*)addr;
+  // Set rewindSequence size to base size if rewindSequence is empty.
+  if (REW_isSequenceEmpty(seq))
+    seq->size = REW_SEQUENCE_BASESIZE;
+  
+  // Determine address of new rewindEntry.
+  entry = (struct REW_RewindEntry*)((u32)seq + seq->size);
+  
+  // Set rewindEntry's size.
+  entry->size = REW_ENTRY_BASESIZE + size;
+  
+  // Add rewindEntry's size to rewindSequence size.
+  seq->size += entry->size;
+  
+  // Return pointer to address of new rewindEntry.
+  return entry;
+}
+
+// Adds additional size to given rewindEntry and the rewindSequence.
+// Returns false if no more space is available in the rewindSequence.
+bool REW_mallocSize(struct REW_RewindEntry* entry, u16 size) {
+  struct REW_RewindSequence* seq = REW_curSequence;
+  
+  // If sequence was marked as not fiting into allocated RAM anymore,
+  // return false.
+  if (seq->size == REW_SEQUENCE_LIMIT_REACHED)
+    return false;
+  
+  // If adding additional size makes sequence not fit into allocated RAM anymore,
+  // mark sequence for ignoring and return false.
+  if ((seq->size + size) > (u16)(u32)(&REW_curSequenceMaxSize)) {
+    seq->size = REW_SEQUENCE_LIMIT_REACHED;
+    return false;
+  }
+  
+  // Add additional size to rewindEntry and rewindSequence.
+  seq->size += size;
+  entry->size += size;
+  return true;
+}
+
+// Makes sure the rewind entry's size is a multiple of 4.
+// We do this to ensure the next entry is word-aligned.
+// This function should only be called after an entry's size is finalized.
+void REW_alignEntry() {
+  struct REW_RewindSequence* seq = REW_curSequence;
+  int align;
+  
+  // If sequence was marked as not fiting into allocated RAM anymore,
+  // don't align entry.
+  if (seq->size == REW_SEQUENCE_LIMIT_REACHED)
+    return;
+  
+  // Don't increase size of sequence if there is no more space for it.
+  align = seq->size & 3;
+  if ((seq->size + (4 - align)) > (u16)(u32)(&REW_curSequenceMaxSize))
+    return;
+  
+  // 4-align the entry with the sequence.
+  if (align)
+    seq->size += 4 - align;
 }
 
 // Given a rewind-sequence, return the next sequence of the buffer.
+// Return NULL instead if the rewind-sequence is at the end of the buffer.
 struct REW_RewindSequence* REW_nextSequence(struct REW_RewindSequence* sequence) {
+  
+  // There is no next sequence if sequence is at the end of buffer.
+  if (REW_rewindBuffer->end == sequence)
+    return NULL;
+  
+  // Otherwise, return the next sequence.
   return (struct REW_RewindSequence*)((u32)(sequence) + 
          (u32)sequence->size);
 }
 
 // Given a rewind-sequence, return the previous sequence of the buffer.
+// Return NULL instead if the rewind-sequence is at the start of the buffer.
 struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence) {
+  
+  // There is no next sequence if sequence is at the start of buffer
+  // or if sizePrev is equal to zero.
+  if (&REW_rewindBuffer->start == sequence || sequence->sizePrev == 0)
+    return NULL;
+  
+  // Otherwise, return the previous sequence.
   return (struct REW_RewindSequence*)((u32)(sequence) - 
          (u32)sequence->sizePrev);
 }
@@ -90,24 +170,6 @@ struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq) {
   
   // Return final entry.
   return prev;
-}
-
-// Sets rewindEntry's size value and adjusts corresponding sequence (seq) size accordingly.
-void REW_addRewindEntrySize(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, int size) {
-  int align;
-  
-  // Set rewindEntry's size.
-  entry->size = size;
-  
-  // Adjust corresponding sequence's size.
-  if (seq->size == 0) { seq->size = REW_SEQUENCE_BASESIZE; }
-  seq->size += entry->size;
-  
-  // Make sure the rewind sequence's size is a multiple of 4.
-  // We do this to ensure the next entry is word-aligned.
-  align = seq->size & 3;
-  if (align)
-    seq->size += 4 - align;
 }
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence) {

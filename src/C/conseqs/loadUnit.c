@@ -19,28 +19,33 @@ void REW_redoLoadUnit(struct REW_RewindEntry* entry) {
 
 // Add loaded unit to rewind sequence.
 void REW_conseqInitUnit(struct Unit* unit, struct UnitDefinition* unitDef) {
+  struct REW_RewindEntry* entry;
+  struct UnitDefinition* unitDefCopy;
   
   // Don't add consequence if sequence is empty.
-  if (REW_curSequence->size == 0)
+  // This is to prevent tracking units loaded before turn 1 starts.
+  if (REW_isSequenceEmpty(REW_curSequence))
     return;
   
   // If unit doesn't exist, ignore.
   if (!UNIT_IS_VALID(unit))
     return;
   
-  // Setup rewind entry.
-  struct REW_RewindEntry* entry = REW_createSeqEntry(REW_curSequence);
+  // Setup rewindEntry.
+  entry = REW_mallocNewRewindEntry(REW_UNITDEFSIZE);
+  if (entry == NULL)
+    return;
   entry->diffType = REW_CONSEQ_UNITLOAD_INIT;
   entry->flags = unit->index;
   
   // Setup unit definition data.
-  struct UnitDefinition* unitDefData = (struct UnitDefinition*)entry->data;
-  CpuCopy16(unitDef, unitDefData, REW_UNITDEFSIZE);
-  unitDefData->xPosition = unit->xPos;
-  unitDefData->yPosition = unit->yPos;
+  unitDefCopy = (struct UnitDefinition*)entry->data;
+  CpuCopy16(unitDef, unitDefCopy, REW_UNITDEFSIZE);
+  unitDefCopy->xPosition = unit->xPos;
+  unitDefCopy->yPosition = unit->yPos;
   
-  // Set entry size & update sequence size.
-  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_UNITDEFSIZE);
+  // Align rewindEntry.
+  REW_alignEntry();
 }
 
 // Finalize loaded units' positions in rewind sequence.

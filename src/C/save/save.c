@@ -30,11 +30,12 @@ void* REW_findRewindBuf() {
   return (void*)(source + chunk->offset);
 }
 
-// Clear the rewind buffer, by setting size val to 0.
+// Clear the rewind buffer, by setting size val to 0
+// and NULLing the end sequence pointer.
 // Executes at the start of a chapter.
 void REW_clearRewindBuf() {
-  u32 val = 0;
-  WriteAndVerifySramFast(&val, REW_findRewindBuf(), 4);
+  u32 val[2] = {0, 0};
+  WriteAndVerifySramFast(&val, REW_findRewindBuf(), 8);
 }
 
 // Save non-player phase changes.
@@ -104,8 +105,8 @@ void REW_loadRewind(void* src, u32 size) {
 // Update saved rewind data.
 // dest is ptr to SRAM which contains rewind data.
 void REW_saveRewind(void* dest, u32 size) {
-  u32 prevSeqSize = 0;
-  struct REW_RewindSequence* newSeq;
+  u32 curSequenceBufferAddress, bufferStartOffset, bufferNewSize;
+  struct REW_RewindSequence* seqIt;
   
   // Skip if there's no new rewind sequence to append.
   if (REW_curSequence->size == 0)
@@ -117,30 +118,62 @@ void REW_saveRewind(void* dest, u32 size) {
       gActionData.suspendPointType == SUSPEND_POINT_PHASECHANGE)
     return;
   
+  // TODO if rewindSequence got too big, empty buffer.
+  // Maybe write an error string instead to help bugreports?
+  
   // Load existing rewind data into buffer.
   REW_loadRewind(dest, size);
   
-  if (REW_rewindBuffer->size != 0) {
-    // Buffer contains at least one sequence.
-    prevSeqSize = REW_rewindBuffer->end->size;
-  } else {
-    // Buffer is empty, initialize size.
+  // If buffer is empty, initialize size.
+  if (REW_rewindBuffer->size == 0) {
     REW_rewindBuffer->size = REW_BUFFER_BASESIZE;
   }
   
-  // Create new sequence at the end of rewindBuffer.
-  // Copy REW_curSequence to it.
-  newSeq = (struct REW_RewindSequence*)((u32)REW_rewindBuffer + REW_rewindBuffer->size);
-  newSeq->sizePrev = prevSeqSize;
-  newSeq->size = REW_curSequence->size;
-  MemCpy((void*)&newSeq->entry[0], (void*)&REW_curSequence->entry[0], REW_curSequence->size - REW_SEQUENCE_BASESIZE);
+  // Make room for sequence in rewindBuffer if necessary.
+  bufferStartOffset = 0;
+  bufferNewSize = REW_rewindBuffer->size;
+  seqIt = &REW_rewindBuffer->start;
+  while (bufferNewSize + REW_curSequence->size > (u16)(u32)(&REW_rewindMaxSize)) {
+    // Not enough space. Trim start of rewindBuffer
+    // until new sequence fits.
+    
+    // No more sequences to trim.
+    if (seqIt == NULL)
+      break;
+    
+    bufferNewSize -= seqIt->size;
+    bufferStartOffset += seqIt->size;
+    seqIt = REW_nextSequence(seqIt);
+  }
+  
+  // After trimming start of queue, mark new first sequence.
+  seqIt->sizePrev = 0;
+  
+  // Calculate where current sequence will land in rewindBuffer.
+  curSequenceBufferAddress = ((u32)(REW_rewindBuffer) + bufferNewSize);
+  
+  // Set current sequence's sizePrev to
+  // Buffer's last sequence's size param.
+  if (REW_rewindBuffer->end != NULL)
+    REW_curSequence->sizePrev = REW_rewindBuffer->end->size;
   
   // Adjust REW_rewindBuffer params.
-  REW_rewindBuffer->size += newSeq->size;
-  REW_rewindBuffer->end = newSeq;
+  REW_rewindBuffer->end = (struct REW_RewindSequence*)curSequenceBufferAddress;
+  REW_rewindBuffer->size = bufferNewSize + REW_curSequence->size;
   
   // Save the data.
-  WriteAndVerifySramFast((void*)REW_rewindBuffer, dest, size);
+  // - Start of buffer.
+  WriteAndVerifySramFast((void*)REW_rewindBuffer, dest, REW_BUFFER_BASESIZE);
+  
+  // - Existing/Untrimmed sequences.
+  WriteAndVerifySramFast((void*)((u32)REW_rewindBuffer + REW_BUFFER_BASESIZE + bufferStartOffset),
+                         (void*)((u32)dest + REW_BUFFER_BASESIZE),
+                         bufferNewSize - REW_BUFFER_BASESIZE);
+  
+  // - Current sequence.
+  WriteAndVerifySramFast((void*)REW_curSequence,
+                         (void*)((u32)dest + bufferNewSize),
+                         REW_curSequence->size);
   
   // Clear current rewind sequence to avoid writing it again.
   REW_clearRewindSeq(REW_curSequence);    // RAM

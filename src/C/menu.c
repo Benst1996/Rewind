@@ -50,7 +50,7 @@ const struct ProcCmd REW_procScr[] = {
 void REW_initProc(struct REW_ProcState* proc) {
   
   // Load rewindBuffer into RAM.
-  REW_loadRewind(REW_findRewindBuf(), (u16)(u32)(&REW_rewindSize));
+  REW_loadRewind(REW_findRewindBuf(), (u16)(u32)(&REW_rewindMaxSize));
   
   // We shouldn't be able to get here,
   // but end proc if rewind buffer is empty.

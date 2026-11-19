@@ -49,7 +49,6 @@ void REW_refreshUI(struct REW_ProcState* proc);
 void REW_procEnd(struct REW_ProcState* proc);
 
 // Data.
-extern const u16*  REW_rewindSize;                    // Size of rewindBuffer.
 extern const void* REW_menuTSA;                       // UI TSA.
 extern const void* REW_phaseAPDef;                    // Phase icon AP Definition.
 extern const void* REW_upArrowAPDef;                  // Up arrow AP Definition.

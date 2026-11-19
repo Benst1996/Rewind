@@ -69,15 +69,17 @@ u8 REW_nextPhase(u8 phase, u8* turn, u8* skip) {
 // Track greyed out units.
 void REW_actionPhaseChangeStart() {
   u8 nextPhase, turnIncr = 0, skip = false;
-  int counter = 0, size = 0, unitID, unitIDCurrFaction;
+  int counter = 0, unitID, unitIDCurrFaction;
   struct Unit* unit;
   struct REW_RewindEntry* entry;
   
-  // Create new entry.
   nextPhase = REW_nextPhase(gPlaySt.faction, &turnIncr, &skip);
-  entry = REW_createSeqEntry(REW_curSequence);
+  
+  // Create new entry.
+  entry = REW_mallocNewRewindEntry(REW_ENTRY_PHASECHANGEDATA_BASESIZE);
+  if (entry == NULL)
+    return;
   entry->diffType = REW_ACTION_PHASECHANGE;
-  size = REW_ENTRY_BASESIZE + REW_ENTRY_PHASECHANGEDATA_BASESIZE;
   
   // Setup flags.
   entry->flags = 0;
@@ -92,22 +94,27 @@ void REW_actionPhaseChangeStart() {
     unit = GetUnit(unitIDCurrFaction);
     if (UNIT_IS_VALID(unit)) {
       if (unit->state & US_UNSELECTABLE) {
+        
+        // Allocate additional space.
+        if (!(REW_mallocSize(entry, 1)))
+          return;
+        
         entry->data[counter] = unitIDCurrFaction;
-        size++;
         counter++;
       }
     }
   }
   
-  // Set entry size & update sequence size.
-  REW_addRewindEntrySize(REW_curSequence, entry, size);
+  // Align rewindEntry.
+  REW_alignEntry();
 }
 
 // Track support exp gains.
 // Mimics ProcessTurnSupportExp 0x8028434,
 // but adds exp gains to rewind data.
 void REW_actionPhaseChangeSuppports() {
-  int i, j, size, jMax, k, exp;
+  int i, j, jMax, k, exp;
+  bool rewindEntryAllocated = false;
   struct REW_RewindEntry* entry;
   struct REW_UnitData* unitData;
 
@@ -129,10 +136,6 @@ void REW_actionPhaseChangeSuppports() {
     if (GetUnitTotalSupportLevel(unit) >= REW_MAX_SIMULTANEOUS_SUPPORT_COUNT)
       continue;
     
-    // Track support exp gains, if unit gets any.
-    entry = REW_createSeqEntry(REW_curSequence);
-    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
-    unitData = (struct REW_UnitData*)entry->data;
     k = 0;
     jMax = GetUnitSupporterCount(unit);
     for (j = 0; j < jMax; j++) {
@@ -169,16 +172,34 @@ void REW_actionPhaseChangeSuppports() {
         
         // Add support gain to unit change data.
         if (exp) {
+          
+          // First time a support gained for the unit.
+          if (!(rewindEntryAllocated)) {
+            
+            // Allocate space for new rewindEntry.
+            entry = REW_mallocNewRewindEntry(REW_ENTRY_UNITDATA_BASESIZE);
+            if (entry == NULL)
+              return;
+            
+            // Track support exp gains, if unit gets any.
+            unitData = (struct REW_UnitData*)entry->data;
+            
+            rewindEntryAllocated = true;
+          }
+          
+          // Allocate additional space.
+          if (!(REW_mallocSize(entry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE)))
+            return;
+          
           unitData->unitChangeData[k].offs = 0x32 + j;
           unitData->unitChangeData[k].diff = exp;
-          size += 2;
           k++;
         }
       }
     }
     
-    // If any support exp was gained, add entry to rewind data.
-    if (size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
+    // If any support exp was gained, fill in additional rewindEntry info.
+    if (rewindEntryAllocated) {
       
       // Finish up rewindentry setup.
       entry->diffType = REW_CONSEQ_UNITCHANGE;
@@ -186,8 +207,8 @@ void REW_actionPhaseChangeSuppports() {
       unitData->x = unit->xPos;
       unitData->y = unit->yPos;
       
-      // Set entry size & update sequence size.
-      REW_addRewindEntrySize(REW_curSequence, entry, size);
+      // Align rewindEntry.
+      REW_alignEntry();
     }
   }
 }
@@ -239,7 +260,8 @@ void REW_actionPhaseChangeTrackStatus() {
 // REW_actionPhaseChangeTrackStatus if these
 // values changed.
 void REW_actionPhaseChangeRecordStatus() {
-  int i, j, size = 0, diff, offs;
+  int i, j, diff, offs;
+  bool rewindEntryAllocated = false;
   u8* unit;
   struct Unit* unit2;
   struct REW_RewindEntry* entry;
@@ -255,24 +277,39 @@ void REW_actionPhaseChangeRecordStatus() {
     unit = (u8*)unit2;
     
     // Add changed unit data to new rewind entry.
-    entry = REW_createSeqEntry(REW_curSequence);
-    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE;
-    unitData = (struct REW_UnitData*)entry->data;
     j = 0;
     for (i = 0; i < REW_PHASECHANGEBUFFER_ENTRYSIZE; i += 2) {
       offs = unitID * REW_PHASECHANGEBUFFER_ENTRYSIZE + i;
       diff = unit[phaseChangeBuffer[offs]] - phaseChangeBuffer[offs + 1];
       
       if (diff) {
+        
+        // First data changed for a unit.
+        if (!(rewindEntryAllocated)) {
+          
+          // Allocate space for new rewindEntry.
+          entry = REW_mallocNewRewindEntry(REW_ENTRY_UNITDATA_BASESIZE);
+          if (entry == NULL)
+            return;
+          
+          // Add changed unit data to new rewind entry.
+          unitData = (struct REW_UnitData*)entry->data;
+          
+          rewindEntryAllocated = true;
+        }
+        
+        // Allocate additional space.
+        if (!(REW_mallocSize(entry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE)))
+          return;
+        
         unitData->unitChangeData[j].offs = phaseChangeBuffer[offs];
         unitData->unitChangeData[j].diff = diff;
-        size += 2;
         j++;
       }
     }
     
-    // If any unit data changed, add entry to rewind data.
-    if (size > REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE) {
+    // If any unit data changed, fill in additional rewindEntry info.
+    if (rewindEntryAllocated) {
       
       // Finish up rewindentry setup.
       entry->diffType = REW_CONSEQ_UNITCHANGE;
@@ -280,8 +317,12 @@ void REW_actionPhaseChangeRecordStatus() {
       unitData->x = unit2->xPos;
       unitData->y = unit2->yPos;
       
-      // Set entry size & update sequence size.
-      REW_addRewindEntrySize(REW_curSequence, entry, size);
+      // Align rewindEntry.
+      REW_alignEntry();
+      
+      // This unit's rewindEntry is finalized.
+      // The next unit will need their own rewindEntry again.
+      rewindEntryAllocated = false;
     }
   }
 }

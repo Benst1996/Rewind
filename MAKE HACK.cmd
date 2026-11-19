@@ -5,7 +5,7 @@ ColorzCore A FE8 "-output:%~dp0FE8_mod.gba" "-input:%~dp0main.event" "--nocash-s
 
 break "%~dp0temp.sym"
 type "%~dp0FE8_mod.sym" >> "%~dp0temp.sym"
-del "%~dp0FE8_mod.sym.sym"
+del "%~dp0FE8_mod.sym"
 
 python3 "%~dp0UnsetThumbBitInSymbolFile.py" "%~dp0temp.sym" "%~dp0FE8_mod.sym"
 

@@ -191,8 +191,8 @@ gSuspendSaveChunks:
 	
   // Rewind data.
   DeclSaveChunk($24CE, $0002, REW_saveActiveUnitMoveOrigin, REW_loadActiveUnitMoveOrigin)
-  DeclSaveChunk($24D0, REW_curSequenceSize, REW_saveCurSequence, REW_loadCurSequence, EMS_CHUNK_REWIND_SEQ)
-  DeclSaveChunk($24D0 + REW_curSequenceSize, REW_rewindSize, REW_saveRewind, 0, EMS_CHUNK_REWIND_BUF)
+  DeclSaveChunk($24D0, REW_curSequenceMaxSize, REW_saveCurSequence, REW_loadCurSequence, EMS_CHUNK_REWIND_SEQ)
+  DeclSaveChunk($24D0 + REW_curSequenceMaxSize, REW_rewindMaxSize, REW_saveRewind, 0, EMS_CHUNK_REWIND_BUF)
   
 	// ends at $4290
 	// free up to $4290 ($0 free bytes)

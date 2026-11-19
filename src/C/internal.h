@@ -30,9 +30,10 @@ enum {
   REW_SEQUENCE_BASESIZE = 4,
   REW_ENTRY_BASESIZE = 4,
   
+  REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE = 2,
   REW_ENTRY_UNITDATA_BASESIZE = 2,
-  REW_ENTRY_OBSTACLE_BASESIZE = 4,
   REW_ENTRY_UNITDEFDATA_SIZE = 3,
+  REW_ENTRY_OBSTACLE_BASESIZE = 4,
   
   // diffTypes. First 0x3F values are reserved for actions,
   // such as UNIT_ACTION_COMBAT as given in FEClib's action.h.
@@ -86,7 +87,7 @@ struct REW_RewindSequence {
 };
 extern struct REW_RewindSequence* REW_curSequence;
 
-// Rewind buffer. Contains RewindSequences.
+// Rewind buffer. Contains RewindSequences. Is a queue, FIFO.
 struct REW_RewindBuffer {
   /* 00 */ u32 size;                        // Consumed space in bytes.
   /* 04 */ struct REW_RewindSequence* end;  // Ptr to last/latest rewind sequence.
@@ -121,14 +122,15 @@ struct REW_UnitDefData {
 } __attribute__((packed));
 
 void REW_clearRewindSeq(struct REW_RewindSequence* sequence);
-int REW_isSequenceEmpty(struct REW_RewindSequence* sequence);
-struct REW_RewindEntry* REW_createSeqEntry(struct REW_RewindSequence* seq);
+bool REW_isSequenceEmpty(struct REW_RewindSequence* sequence);
+struct REW_RewindEntry* REW_mallocNewRewindEntry(u16 size);
+bool REW_mallocSize(struct REW_RewindEntry* entry, u16 size);
+void REW_alignEntry();
 struct REW_RewindSequence* REW_nextSequence(struct REW_RewindSequence* sequence);
 struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence);
 struct REW_RewindEntry* REW_nextEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_prevEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq);
-void REW_addRewindEntrySize(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, int size);
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence);
 int REW_isRedoAvailable(struct REW_RewindSequence* sequence);
@@ -137,5 +139,8 @@ void REW_getCoordinateDifference(struct REW_UnitChangeData* unitChangeData, u16 
 u8 REW_getUnitID(struct REW_UnitData* unitData, u16 size, u8 mode);
 void REW_hideRoofedUnits();
 void REW_loadUnit(struct Unit* unit, struct REW_UnitDefData* unitDefData, s8 x, s8 y);
+
+extern const u16* REW_rewindMaxSize;
+extern const u16* REW_curSequenceMaxSize;
 
 #endif // INTERNAL_H

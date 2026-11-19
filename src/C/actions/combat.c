@@ -431,6 +431,11 @@ void REW_storeCombatData(struct Unit* unit,
   //  - unitState postCombat.
   buCopy.state |= postCombatStateMask;
   
+  // Allocate space for unitData.
+  // Return if no space available.
+  if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITDATA_BASESIZE))
+    return;
+  
   //  - X and Y position.
   unitData = (struct REW_UnitData*)rewindEntry->data;
   unitData->x = xPrev;
@@ -440,12 +445,22 @@ void REW_storeCombatData(struct Unit* unit,
   //  - Position changes.
   diff = buCopy.xPos - xPrev;
   if (diff) {
+    
+    // Allocate space for unitChangeData element.
+    if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+      return;
+    
     unitData->unitChangeData[changeIdx].offs = 0x10;
     unitData->unitChangeData[changeIdx].diff = diff;
     changeIdx += 1;
   }
   diff = buCopy.yPos - yPrev;
   if (diff) {
+    
+    // Allocate space for unitChangeData element.
+    if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+      return;
+    
     unitData->unitChangeData[changeIdx].offs = 0x11;
     unitData->unitChangeData[changeIdx].diff = diff;
     changeIdx += 1;
@@ -455,6 +470,11 @@ void REW_storeCombatData(struct Unit* unit,
   for (i = 0; i < REW_UNITSIZE; i++) {
     diff = unitPost[i] - unitPre[i];
     if (diff) {
+      
+      // Allocate space for unitChangeData element.
+      if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+        return;
+      
       unitData->unitChangeData[changeIdx].offs = i;
       unitData->unitChangeData[changeIdx].diff = diff;
       changeIdx += 1;
@@ -469,6 +489,11 @@ void REW_storeCombatData(struct Unit* unit,
     for (i = 0; i < REW_BWLSIZE; i++) {
       diff = ((u8*)(&bwlPost))[i] - ((u8*)bwlPre)[i];
       if (diff) {
+        
+        // Allocate space for unitChangeData element.
+        if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+          return;
+        
         unitData->unitChangeData[changeIdx].offs = REW_UNITOFFS_BWL + i;
         unitData->unitChangeData[changeIdx].diff = diff;
         changeIdx += 1;
@@ -480,15 +505,19 @@ void REW_storeCombatData(struct Unit* unit,
   if (buCopy.ballistaIndex != 0 && bu->weapon != 0) {
     diff = GetItemUses(bu->weapon) - GetTrap(buCopy.ballistaIndex)->data[TRAP_EXTDATA_BLST_ITEMUSES];
     if (diff) {
+      
+      // Allocate space for unitChangeData element.
+      if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+        return;
+      
       unitData->unitChangeData[changeIdx].offs = REW_UNITOFFS_BALLISTA_USES;
       unitData->unitChangeData[changeIdx].diff = diff;
       changeIdx += 1;
     }
   }
   
-  // Set entry size & update sequence size.
-  REW_addRewindEntrySize(rewindSeq, rewindEntry,
-                         REW_ENTRY_BASESIZE + REW_ENTRY_UNITDATA_BASESIZE + changeIdx * 2);
+  // Align entry.
+  REW_alignEntry();
 }
 
 // Store unit's changes resulting from combat in which the unit died.
@@ -518,7 +547,6 @@ void REW_storeCombatDataDead(struct Unit* unit,
   struct UnitUsageStats bwlPost;
   int i, unitSupporterIndex, unitSupporterCount;
   int changeIdx = 0;
-  int size = 0;
   u8 diff;
   struct Unit referenceUnit;
   struct Unit* supporterUnit;
@@ -535,6 +563,13 @@ void REW_storeCombatDataDead(struct Unit* unit,
     
     // Track supports. These will be cleared post-death.
     unitSupporterCount = GetUnitSupporterCount(unit);
+    
+    // Allocate space for support values and unitData.
+    // Return if no space available.
+    if (!REW_mallocSize(rewindEntry, unitSupporterCount + REW_ENTRY_UNITDATA_BASESIZE))
+      return;
+    
+    // Track supports.
     for (i = 0; i < unitSupporterCount; i++) {
       
       supporterUnit = GetUnitSupporterUnit(unit, i);
@@ -560,13 +595,15 @@ void REW_storeCombatDataDead(struct Unit* unit,
     referenceUnit.state &= ~US_IN_BALLISTA;
     referenceUnit.ballistaIndex = 0;
     
-    // Determine initial entry size.
-    size = REW_ENTRY_BASESIZE + unitSupporterCount + REW_ENTRY_UNITDATA_BASESIZE;
-    
   } else {
     
     // Unit will get cleared.
     rewindEntry->flags = REW_UNITDIED_CLEARED;
+    
+    // Allocate space for unitDefData and unitData.
+    // Return if no space available.
+    if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITDEFDATA_SIZE + REW_ENTRY_UNITDATA_BASESIZE))
+      return;
     
     // Set unitData to be after unitDefData.
     unitData = (struct REW_UnitData*)((u32)unitDefData + (u32)REW_ENTRY_UNITDEFDATA_SIZE);
@@ -588,9 +625,6 @@ void REW_storeCombatDataDead(struct Unit* unit,
     referenceUnit.index = unit->index;      // Don't alter unit index in gUnitArray.
                                             // Unit might be loaded in different slot, that's okay.
     referenceUnit.pMapSpriteHandle = unit->pMapSpriteHandle;   // Need a new one when reloading.
-    
-    // Determine initial entry size.
-    size = REW_ENTRY_BASESIZE + REW_ENTRY_UNITDEFDATA_SIZE;
   }
   
   // Now store changes of unit.
@@ -602,6 +636,11 @@ void REW_storeCombatDataDead(struct Unit* unit,
     diff = unit1[i] - unit2[i];
     
     if (diff) {
+      
+      // Allocate space for unitChangeData element.
+      if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+        return;
+      
       unitData->unitChangeData[changeIdx].offs = i;
       unitData->unitChangeData[changeIdx].diff = diff;
       changeIdx += 1;
@@ -616,6 +655,11 @@ void REW_storeCombatDataDead(struct Unit* unit,
     for (i = 0; i < REW_BWLSIZE; i++) {
       diff = ((u8*)(&bwlPost))[i] - ((u8*)bwlPre)[i];
       if (diff) {
+        
+        // Allocate space for unitChangeData element.
+        if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+          return;
+        
         unitData->unitChangeData[changeIdx].offs = REW_UNITOFFS_BWL + i;
         unitData->unitChangeData[changeIdx].diff = diff;
         changeIdx += 1;
@@ -627,15 +671,19 @@ void REW_storeCombatDataDead(struct Unit* unit,
   if (unit->ballistaIndex != 0 && bu->weapon != 0) {
     diff = GetItemUses(bu->weapon) - GetTrap(unit->ballistaIndex)->data[TRAP_EXTDATA_BLST_ITEMUSES];
     if (diff) {
+      
+      // Allocate space for unitChangeData element.
+      if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
+        return;
+      
       unitData->unitChangeData[changeIdx].offs = REW_UNITOFFS_BALLISTA_USES;
       unitData->unitChangeData[changeIdx].diff = diff;
       changeIdx += 1;
     }
   }
   
-  // Set entry size & update sequence size.
-  size += changeIdx * 2;
-  REW_addRewindEntrySize(rewindSeq, rewindEntry, size);
+  // Align entry.
+  REW_alignEntry();
 }
 
 // Store changes resulting from a combat action.
@@ -646,7 +694,10 @@ void REW_actionCombat() {
   struct Unit* target = GetUnit(gBattleTarget.unit.index);
   
   // Actor.
-  rewindEntry = REW_createSeqEntry(rewindSeq);
+  // Allocate new rewindEntry.
+  rewindEntry = REW_mallocNewRewindEntry(0);
+  if (rewindEntry == NULL)
+    return;
   rewindEntry->diffType = UNIT_ACTION_COMBAT;   //  TODO Incorporate deaths and/or other flags.
   
   if (gBattleActor.unit.curHP == 0) {
@@ -685,7 +736,10 @@ void REW_actionCombat() {
   }
   
   // Target.
-  rewindEntry = REW_createSeqEntry(rewindSeq);
+  // Allocate new rewindEntry.
+  rewindEntry = REW_mallocNewRewindEntry(0);
+  if (rewindEntry == NULL)
+    return;
   
   if (target) {
     rewindEntry->diffType = UNIT_ACTION_COMBAT;   //  TODO Incorporate deaths and/or other flags.
@@ -725,13 +779,18 @@ void REW_actionCombat() {
     if (gBmMapTerrain[gBattleTarget.unit.yPos][gBattleTarget.unit.xPos] == REW_SNAG_ID)
       rewindEntry->flags |= REW_OBSTACLE_SNAG;
     
+    // Allocate space for trapData.
+    // Return if no space available.
+    if (!REW_mallocSize(rewindEntry, REW_ENTRY_OBSTACLE_BASESIZE))
+      return;
+    
     struct Trap* trapData = (struct Trap*)rewindEntry->data;
     trapData->xPos = trap->xPos;
     trapData->yPos = trap->yPos;
     trapData->type = trap->type;
     trapData->extra = gBattleTarget.unit.curHP - trap->extra;
     
-    // Set entry size & update sequence size.
-    REW_addRewindEntrySize(rewindSeq, rewindEntry, REW_ENTRY_BASESIZE + REW_ENTRY_OBSTACLE_BASESIZE);
+    // Align entry.
+    REW_alignEntry();
   }
 }

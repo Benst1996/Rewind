@@ -38,10 +38,10 @@ POP
 // Their values need to add up to at most 0x1DC0.
   // Game can save before action has completed.
   // This is used to save partial actions.
-  #define REW_curSequenceSize 0x268
+  #define REW_curSequenceMaxSize 0x268
 
   // Save space size for rewind.
-  #define REW_rewindSize 0x1B58
+  #define REW_rewindMaxSize 0x1B58
 
 #include "txt/txt.event"
 #include "src/EA.event"

@@ -151,12 +151,18 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   if (itemSlot <= 0)
     return;
   
+  // If unit is not valid, return.
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
   // Don't track reordering for temporary/copy units.
   if (GetUnit(unit->index) != unit)
     return;
   
   // Create new RewindEntry for REW_CONSEQ_INVENTORYREORDER.
-  entry = REW_createSeqEntry(REW_curSequence);
+  entry = REW_mallocNewRewindEntry(REW_ENTRY_INVENTORYREORDER_SIZE);
+  if (entry == NULL)
+    return;
   entry->diffType = REW_CONSEQ_INVENTORYREORDER;
   inventoryReorderFlags = (struct REW_InventoryReorderFlags*)&entry->flags;
   inventoryReorder = (struct REW_InventoryReorder*)entry->data;
@@ -183,8 +189,8 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   if (itemSlot > 3)
     inventoryReorderFlags->item4Pos = 1;
   
-  // Set entry size & update sequence size.
-  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_ENTRY_INVENTORYREORDER_SIZE);
+  // Align rewindEntry.
+  REW_alignEntry();
 }
 
 // Track when a unit obtains an item.
@@ -208,8 +214,16 @@ void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtaine
   if (!UNIT_IS_VALID(unit))
     return;
   
+  // If unit has no HP (unit is being loaded),
+  // don't track; Return.
+  if (unit->curHP == 0)
+    return;
+  
   // Create new RewindEntry for REW_CONSEQ_ITEMOBTAINED_UNIT.
-  entry = REW_createSeqEntry(REW_curSequence);
+  entry = REW_mallocNewRewindEntry(REW_CONSEQ_ITEMOBTAINED_UNIT_SIZE);
+  if (entry == NULL)
+    return;
+  
   entry->diffType = REW_CONSEQ_ITEMOBTAINED_UNIT;
   itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
   
@@ -220,6 +234,6 @@ void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtaine
   // Track item.
   itemObtainedUnit->item = item;
   
-  // Set entry size & update sequence size.
-  REW_addRewindEntrySize(REW_curSequence, entry, REW_ENTRY_BASESIZE + REW_CONSEQ_ITEMOBTAINED_UNIT_SIZE);
+  // Align rewindEntry.
+  REW_alignEntry();
 }
