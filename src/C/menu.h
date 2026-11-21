@@ -53,8 +53,8 @@ extern const void* REW_menuTSA;                       // UI TSA.
 extern const void* REW_phaseAPDef;                    // Phase icon AP Definition.
 extern const void* REW_upArrowAPDef;                  // Up arrow AP Definition.
 extern const void* REW_downArrowAPDef;                // Down arrow AP Definition.
-extern const u16 REW_combat, REW_phaseIndicator,      // Text entries.
+extern const u16 REW_phaseIndicator,                  // Text entries.
 REW_phaseBlue, REW_phaseRed, REW_phaseGreen,
-REW_obstacleDestroyed;
+REW_combat, REW_obstacleDestroyed, REW_txtOpenedChest;
 
 #endif // MENU_H

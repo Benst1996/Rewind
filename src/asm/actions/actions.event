@@ -19,22 +19,30 @@ PUSH
     POIN REW_actionPhaseChangeStart | 1
     SHORT 0xB 0xB
     WORD 0x0
+    
   //   - This hook is before traps are updated and before suspend.
   //     This hook will run for every further phase change of the map.
   ORG 0x154C8
     jumpToHack(REW_actionHookPhaseChangeStart)
+    
   // - Tracks support exp gains. Replaces ProcessTurnSupportExp.
   ORG 0x28434
     jumpToHack(REW_actionPhaseChangeSuppports)
+    
   // - Hooks after gProc_BMapMain label 9, sets up some data in RAM.
   ORG 0x59A2A4
     POIN REW_actionPhaseChangeTrackStatus | 1
+    
   // - Hooks immediately before gProc_BMapMain label 5.
   //   Compares data setup previously to current values and
   //   adds differences to rewind data.
   ORG 0x59A2D0
     WORD 0x2
     POIN REW_actionPhaseChangeRecordStatus | 1
+  
+  // Track whenever a unit opens a chest.
+  ORG 0x23E6C
+    jumpToHack(REW_hookOpenChest)
 
 POP
 
@@ -42,3 +50,4 @@ ALIGN 4; REW_actionHookCombat:
 #include "combat.lyn.event"
 ALIGN 4; REW_actionHookPhaseChangeStart:
 #include "phaseChange.lyn.event"
+ALIGN 4; #include "unlock.lyn.event"

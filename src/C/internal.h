@@ -1,7 +1,6 @@
 #ifndef INTERNAL_H
 #define INTERNAL_H
 #include "gbafe.h"
-//#include "save/save.h"
 
 enum {
   // Vanilla.
@@ -23,6 +22,10 @@ enum {
   // Size limit identifiers.
   REW_SEQUENCE_LIMIT_REACHED = 0xFFFF,
   REW_BUFFER_LIMIT_REACHED = 0xFFFF,
+  
+  // Other special size codes.
+  REW_SAVE_BUFFERHEADER = 0xFFFE,     // If REW_curSequence->sizePrev is this value
+                                      // only save buffer header.
   
   // Entry & data sizes. Keep having to change these
   // so I made them into an enum.
@@ -77,6 +80,14 @@ struct REW_RewindEntry {
   /* 02 */ u16 size;                        // Size of entry.
   /* 04 */ u8 data[];                       // Structure depends on diffType.
 };
+
+// Most actions' rewindEntry->data will start
+// with these. Exceptions: combat & phaseChange.
+#define REW_ACTION_REWINDENTRYDATA_HEADER \
+  /* 00 */ s8 xPrev;                      \
+  /* 01 */ s8 yPrev;                      \
+  /* 02 */ s8 x;                          \
+  /* 03 */ s8 y;                          \
 
 // Rewind sequence. Action + consequences.
 struct REW_RewindSequence {

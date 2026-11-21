@@ -108,6 +108,22 @@ void REW_saveRewind(void* dest, u32 size) {
   u32 curSequenceBufferAddress, bufferStartOffset, bufferNewSize;
   struct REW_RewindSequence* seqIt;
   
+  // Save only the rewindBuffer header if
+  // the current REW_curSequence->sizePrev is a special value.
+  // In this case, the player has confirmed a rewind
+  // and the rewind buffer has been loaded already.
+  if (REW_curSequence->sizePrev == REW_SAVE_BUFFERHEADER) {
+    
+    // Save.
+    WriteAndVerifySramFast((void*)REW_rewindBuffer, dest, REW_BUFFER_BASESIZE);
+    
+    // Clear current rewind sequence to be safe.
+    REW_clearRewindSeq(REW_curSequence);    // RAM.
+    REW_clearCurSequence();                 // SRAM.
+    
+    return;
+  }
+  
   // Skip if there's no new rewind sequence to append.
   if (REW_curSequence->size == 0)
     return;
@@ -176,6 +192,6 @@ void REW_saveRewind(void* dest, u32 size) {
                          REW_curSequence->size);
   
   // Clear current rewind sequence to avoid writing it again.
-  REW_clearRewindSeq(REW_curSequence);    // RAM
-  REW_clearCurSequence();                 // SRAM
+  REW_clearRewindSeq(REW_curSequence);    // RAM.
+  REW_clearCurSequence();                 // SRAM.
 }

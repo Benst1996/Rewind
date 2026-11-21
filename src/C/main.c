@@ -23,6 +23,11 @@ void REW_undo(struct REW_RewindSequence* sequence) {
         REW_undoObstacleCombat(entry);
         break;
       
+      // Chest opening action.
+      case UNIT_ACTION_CHEST:
+        REW_undoChestOpened(entry);
+        break;
+      
       // Generic unit changes.
       case REW_CONSEQ_UNITCHANGE:
       
@@ -83,6 +88,11 @@ void REW_redo(struct REW_RewindSequence* sequence) {
       // Breaking an obstacle.
       case REW_ACTION_BREAK:
         REW_redoObstacleCombat(entry);
+        break;
+      
+      // Chest opening action.
+      case UNIT_ACTION_CHEST:
+        REW_redoChestOpened(entry);
         break;
       
       // Generic unit changes.

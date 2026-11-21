@@ -228,8 +228,8 @@ void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtaine
   itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
   
   // Track unit's X and Y.
-  itemObtainedUnit->x = gActiveUnitMoveOrigin.x;
-  itemObtainedUnit->y = gActiveUnitMoveOrigin.y;
+  itemObtainedUnit->x = gActiveUnit->xPos;
+  itemObtainedUnit->y = gActiveUnit->yPos;
   
   // Track item.
   itemObtainedUnit->item = item;

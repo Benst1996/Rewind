@@ -70,19 +70,42 @@ void REW_initProc(struct REW_ProcState* proc) {
 
 // Draws actor (left unit) name & starts MU.
 void REW_displayActor(struct REW_ProcState* proc, struct REW_RewindEntry* rewindEntry, struct Text* sequenceDesc) {
-  struct Unit* unit = GetUnit(rewindEntry->flags);
+  struct Unit* unit = NULL;
   struct Unit referenceUnit;
+  u8 x, y, unitID;
   
-  // Check if unit died.
-  if (rewindEntry->flags == REW_UNITDIED_CLEARED) {
+  // Check if action is combat.
+  if (rewindEntry->diffType == UNIT_ACTION_COMBAT) {
+  
+    // Check if unit died.
+    if (rewindEntry->flags == REW_UNITDIED_CLEARED) {
+      
+      // Unit died and got cleared. Create temporary unit instead.
+      REW_loadUnit(&referenceUnit, (struct REW_UnitDefData*)rewindEntry->data, 0, 0);
+      unit = &referenceUnit;
+      
+    } else if ((rewindEntry->flags & REW_UNITDIED_NOCLEAR) == REW_UNITDIED_NOCLEAR) {
+      
+      // Unit died but did not get cleared.
+      unit = GetUnit(rewindEntry->flags & ~REW_UNITDIED_NOCLEAR);
+      
+    } else {
+      
+      // Unit did not die.
+      unit = GetUnit(rewindEntry->flags);
+    }
     
-    // Unit died and got cleared. Create temporary unit instead.
-    REW_loadUnit(&referenceUnit, (struct REW_UnitDefData*)rewindEntry->data, 0, 0);
-    unit = &referenceUnit;
-  } else if ((rewindEntry->flags & REW_UNITDIED_NOCLEAR) == REW_UNITDIED_NOCLEAR) {
+  } else {
     
-    // Unit died but did not get cleared.
-    unit = GetUnit(rewindEntry->flags & ~REW_UNITDIED_NOCLEAR);
+    // For every other action we assume data is
+    // headed by REW_ACTION_REWINDENTRYDATA_HEADER.
+    x = rewindEntry->data[2];
+    y = rewindEntry->data[3];
+    
+    // Find unit.
+    unitID = gBmMapUnit[y][x];
+    unit = GetUnit(unitID);
+    
   }
   
   u16 name = unit->pCharacterData->nameTextId;
@@ -294,6 +317,7 @@ void REW_refreshUI(struct REW_ProcState* proc) {
         Text_DrawCharacter(sequenceDesc, ".");                                      // Period.
         PutText(sequenceDesc, TILEMAP_LOCATED(gBG0TilemapBuffer, 5, 2));
         break;
+        
       case REW_ACTION_PHASECHANGE:
         actionNotFound = false;
         
@@ -302,11 +326,13 @@ void REW_refreshUI(struct REW_ProcState* proc) {
             Text_DrawString(sequenceDesc, GetStringFromIndex(TEXTID(REW_phaseBlue)));
             PutText(sequenceDesc, TILEMAP_LOCATED(gBG0TilemapBuffer, 6, 2));
             break;
+            
           case FACTION_RED:
             Text_Skip(sequenceDesc, 1);
             Text_DrawString(sequenceDesc, GetStringFromIndex(TEXTID(REW_phaseRed)));
             PutText(sequenceDesc, TILEMAP_LOCATED(gBG0TilemapBuffer, 6, 2));
             break;
+            
           case FACTION_GREEN:
           default:
             Text_Skip(sequenceDesc, 4);
@@ -314,6 +340,15 @@ void REW_refreshUI(struct REW_ProcState* proc) {
             PutText(sequenceDesc, TILEMAP_LOCATED(gBG0TilemapBuffer, 6, 2));
         }
         break;
+        
+      case UNIT_ACTION_CHEST:
+        actionNotFound = false;
+        
+        REW_displayActor(proc, rewindEntry, sequenceDesc);
+        Text_DrawString(sequenceDesc, GetStringFromIndex(TEXTID(REW_txtOpenedChest)));
+        PutText(sequenceDesc, TILEMAP_LOCATED(gBG0TilemapBuffer, 6, 2));
+        break;
+        
       default:
         rewindEntry = REW_nextEntry(proc->curSequence, rewindEntry);
     }
@@ -326,9 +361,17 @@ void REW_handleInput(struct REW_ProcState* proc) {
   int phase = gPlaySt.faction;
   int turn = gPlaySt.chapterTurnNumber;
   
-  // Up-press: rewind/undo action.
+  // Key-input.
   if ((gKeyStatusPtr->repeatedKeys & DPAD_UP) && (proc->flags & REW_UNDO_AVAILABLE)) {
-    PlaySoundEffect(0x66);
+    // Up-press: rewind/undo action.
+    
+    PlaySoundEffect(SONG_SE_SYS_CURSOR_UD1);
+    
+    // If any partial actions have been taken
+    // and we're at the tail of the queue
+    // rewind those consequences too.
+    if (!REW_isSequenceEmpty(REW_curSequence) && (REW_rewindBuffer->end == proc->curSequence))
+      REW_undo(REW_curSequence);
     
     // Undo action.
     REW_undo(proc->curSequence);
@@ -353,15 +396,23 @@ void REW_handleInput(struct REW_ProcState* proc) {
     // Refresh units.
     RefreshEntityBmMaps();
     RefreshUnitSprites();
-  } // Down-press: redo action.
-  else if ((gKeyStatusPtr->repeatedKeys & DPAD_DOWN) && (proc->flags & REW_REDO_AVAILABLE)) {
-    PlaySoundEffect(0x66);
+    
+  } else if ((gKeyStatusPtr->repeatedKeys & DPAD_DOWN) && (proc->flags & REW_REDO_AVAILABLE)) {
+    // Down-press: redo action.
+    
+    PlaySoundEffect(SONG_SE_SYS_CURSOR_UD1);
     
     // Set next sequence as current sequence.
     proc->curSequence = REW_nextSequence(proc->curSequence);
     
     // Redo action.
     REW_redo(proc->curSequence);
+    
+    // If any partial actions had been taken
+    // and we're at the tail of the queue
+    // redo that sequence too.
+    if (!REW_isSequenceEmpty(REW_curSequence) && !REW_isRedoAvailable(proc->curSequence))
+      REW_redo(REW_curSequence);
     
     // Update flags tracking if phase or turn display
     // needs to refresh.
@@ -371,7 +422,8 @@ void REW_handleInput(struct REW_ProcState* proc) {
       proc->flags |= REW_REFRESH_TURN;
     
     // Update flags tracking if another redo is available.
-    if (!REW_isRedoAvailable(proc->curSequence)) { proc->flags &= ~REW_REDO_AVAILABLE; }
+    if (!REW_isRedoAvailable(proc->curSequence))
+      proc->flags &= ~REW_REDO_AVAILABLE;
     proc->flags |= REW_UNDO_AVAILABLE;
     
     // Draw next sequence.
@@ -380,9 +432,58 @@ void REW_handleInput(struct REW_ProcState* proc) {
     // Refresh units.
     RefreshEntityBmMaps();
     RefreshUnitSprites();
+    
+  } else if (gKeyStatusPtr->repeatedKeys & B_BUTTON) {
+    // B-press. Set cursor to present by
+    // redoing all sequences that have been undone.
+    
+    PlaySoundEffect(SONG_SE_SYS_WINDOW_CANSEL1);
+    
+    while (REW_isRedoAvailable(proc->curSequence)) {
+      
+      // Set next sequence as current sequence.
+      proc->curSequence = REW_nextSequence(proc->curSequence);
+      
+      // Redo this sequence.
+      REW_redo(proc->curSequence);
+    }
+    
+    // If any partial actions had been taken
+    // redo that sequence too.
+    if (!REW_isSequenceEmpty(REW_curSequence))
+      REW_redo(REW_curSequence);
+    
+    // Move procScript to endProc.
+    Proc_Goto(proc, 3);
+    
+  } else if (gKeyStatusPtr->repeatedKeys & A_BUTTON) {
+    // A-press. Confirm rewind and exit menu.
+    
+    PlaySoundEffect(SONG_SE_SYS_WINDOW_SELECT1);
+    
+    // Move procScript to endProc.
+    Proc_Goto(proc, 3);
+    
+    // If we're at the tail of the queue then
+    // nothing was undone. No need to save.
+    if (!REW_isRedoAvailable(proc->curSequence))
+      return;
+    
+    // We clear sequences that have been re-wound
+    // by setting REW_curSequence->sizePrev to a special value.
+    REW_curSequence->sizePrev = REW_SAVE_BUFFERHEADER;
+    
+    // Set buffer's end pointer to the current sequence.
+    REW_rewindBuffer->end = proc->curSequence;
+    
+    // Update buffer's size value.
+    REW_rewindBuffer->size = ((u32)(proc->curSequence) +
+                              (u32)(proc->curSequence->size)) -
+                              (u32)(REW_rewindBuffer);
+    
+    // Save.
+    PlayerPhase_Suspend();
   }
-  // TODO other buttons.
-  
 }
 
 // Clear BGs, APs & MUs.

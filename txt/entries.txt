@@ -11,6 +11,9 @@ TODO description of rewind.[X]
 ## REW_obstacleDestroyed
  destroyed [X]
 
+## REW_txtOpenedChest
+ opened chest.[X]
+
 ## REW_phaseIndicator
 Phase [X]
 
