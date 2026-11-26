@@ -12,15 +12,11 @@ struct UnitUsageStats REW_applyBWLChanges(struct BattleUnit* bu);
 void REW_storeCombatData(struct Unit* unit,
                          struct BattleUnit* bu,
                          u32 postCombatStateMask,
-                         s8 xPrev,
-                         s8 yPrev,
                          struct REW_RewindSequence* rewindSeq,
                          struct REW_RewindEntry* rewindEntry);
 void REW_storeCombatDataDead(struct Unit* unit,
                              struct BattleUnit* bu,
                              u32 postCombatStateMask,
-                             s8 xPrev,
-                             s8 yPrev,
                              struct REW_RewindSequence* rewindSeq,
                              struct REW_RewindEntry* rewindEntry);
 void REW_actionCombat();

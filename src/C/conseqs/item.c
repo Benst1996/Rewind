@@ -69,14 +69,14 @@ void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo) {
 
 // Undo unit obtaining an item.
 void REW_undoItemObtainedUnit(struct REW_RewindEntry* entry) {
-  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  struct REW_ItemUnit* itemUnit;
   s8 unitID;
   struct Unit* unit;
   
-  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
+  itemUnit = (struct REW_ItemUnit*)entry->data;
   
   // Find unit.
-  unitID = gBmMapUnit[itemObtainedUnit->y][itemObtainedUnit->x];
+  unitID = gBmMapUnit[itemUnit->y][itemUnit->x];
   unit = GetUnit(unitID);
   if (!UNIT_IS_VALID(unit))
     return;
@@ -102,15 +102,15 @@ void REW_undoItemRemovedSupply(struct REW_RewindEntry* entry) {
 
 // Redo unit obtaining an item.
 void REW_redoItemObtainedUnit(struct REW_RewindEntry* entry) { 
-  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  struct REW_ItemUnit* itemUnit;
   s8 unitID;
   struct Unit* unit;
   int itemCount;
   
-  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
+  itemUnit = (struct REW_ItemUnit*)entry->data;
   
   // Find unit.
-  unitID = gBmMapUnit[itemObtainedUnit->y][itemObtainedUnit->x];
+  unitID = gBmMapUnit[itemUnit->y][itemUnit->x];
   unit = GetUnit(unitID);
   if (!UNIT_IS_VALID(unit))
     return;
@@ -122,7 +122,7 @@ void REW_redoItemObtainedUnit(struct REW_RewindEntry* entry) {
     return;
   
   // Add obtained item to unit's inventory.
-  unit->items[itemCount] = itemObtainedUnit->item;
+  unit->items[itemCount] = itemUnit->item;
 }
 
 // Redo unit losing an item.
@@ -138,6 +138,136 @@ void REW_redoItemObtainedSupply(struct REW_RewindEntry* entry) {
 // Redo item removed from supply.
 void REW_redoItemRemovedSupply(struct REW_RewindEntry* entry) { 
 
+}
+
+// Undo unit exchanging items with supply.
+void REW_undoUnitSupplyExchange(struct REW_RewindEntry* entry) {
+  s8 unitID;
+  struct Unit* unit;
+  int a, b;
+  u16 itemsBefore[UNIT_ITEM_COUNT] = {0, 0, 0, 0, 0};
+  u16 itemsAfter[UNIT_ITEM_COUNT] = {0, 0, 0, 0, 0};
+  struct REW_UnitSupplyExchange* unitSupplyExchange;
+  unitSupplyExchange = (struct REW_UnitSupplyExchange*)entry->data;
+  
+  // Find unit.
+  unitID = gBmMapUnit[unitSupplyExchange->y][unitSupplyExchange->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // Copy units' items before and after supply exchange.
+  for (b = 0; b < UNIT_ITEM_COUNT; b++) {
+    itemsBefore[b] = unitSupplyExchange->itemsBefore[b];
+    itemsAfter[b] = unitSupplyExchange->itemsAfter[b];
+    
+    // Set unit's inventory to inventory before supply exchange.
+    unit->items[b] = unitSupplyExchange->itemsBefore[b];
+  }
+  
+  // Iterate over units' items before and after exchange
+  // and clear matching items in both arrays.
+  for (a = 0; a < UNIT_ITEM_COUNT; a++) {
+    if (itemsAfter[a] != 0) {
+      for (b = 0; b < UNIT_ITEM_COUNT; b++) {
+        if (itemsAfter[a] == itemsBefore[b]) {
+          itemsAfter[a] = 0;
+          itemsBefore[b] = 0;
+          break;
+        }
+      }
+    }
+  }
+  
+  // Remove leftover before-items from supply.
+  for (b = 0; b < UNIT_ITEM_COUNT; b++) {
+    if (itemsBefore[b] != 0) {
+      if (REW_removeItemFromSupply(itemsBefore[b]) == -1) {
+        // Item could not be found in supply.
+        // FIXME, add debug printing, we're not supposed to get here!
+        ;
+      }
+    }
+  }
+  
+  // Cleans up empty item gaps in supply.
+  ShrinkConvoyItemList();
+  
+  // Add leftover after-items to supply.
+  for (a = 0; a < UNIT_ITEM_COUNT; a++) {
+    if (itemsAfter[a] != 0) {
+      if (AddItemToConvoy(itemsAfter[a]) == -1) {
+        // No more room in supply for item.
+        // FIXME, add debug printing, we're not supposed to get here!
+        ;
+      }
+    }
+  }
+}
+
+// Redo unit exchanging items with supply.
+void REW_redoUnitSupplyExchange(struct REW_RewindEntry* entry) {
+  s8 unitID;
+  struct Unit* unit;
+  int a, b;
+  u16 itemsBefore[UNIT_ITEM_COUNT] = {0, 0, 0, 0, 0};
+  u16 itemsAfter[UNIT_ITEM_COUNT] = {0, 0, 0, 0, 0};
+  struct REW_UnitSupplyExchange* unitSupplyExchange;
+  unitSupplyExchange = (struct REW_UnitSupplyExchange*)entry->data;
+  
+  // Find unit.
+  unitID = gBmMapUnit[unitSupplyExchange->y][unitSupplyExchange->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // Copy units' items before and after supply exchange.
+  for (a = 0; a < UNIT_ITEM_COUNT; a++) {
+    itemsBefore[a] = unitSupplyExchange->itemsBefore[a];
+    itemsAfter[a] = unitSupplyExchange->itemsAfter[a];
+    
+    // Set unit's inventory to inventory after supply exchange.
+    unit->items[a] = unitSupplyExchange->itemsAfter[a];
+  }
+  
+  // Iterate over units' items before and after exchange
+  // and clear matching items in both arrays.
+  for (a = 0; a < UNIT_ITEM_COUNT; a++) {
+    if (itemsAfter[a] != 0) {
+      for (b = 0; b < UNIT_ITEM_COUNT; b++) {
+        if (itemsAfter[a] == itemsBefore[b]) {
+          itemsAfter[a] = 0;
+          itemsBefore[b] = 0;
+          break;
+        }
+      }
+    }
+  }
+  
+  // Remove leftover after-items from supply.
+  for (a = 0; a < UNIT_ITEM_COUNT; a++) {
+    if (itemsAfter[a] != 0) {
+      if (REW_removeItemFromSupply(itemsAfter[a]) == -1) {
+        // Item could not be found in supply.
+        // FIXME, add debug printing, we're not supposed to get here!
+        ;
+      }
+    }
+  }
+  
+  // Cleans up empty item gaps in supply.
+  ShrinkConvoyItemList();
+  
+  // Add leftover before-items to supply.
+  for (b = 0; b < UNIT_ITEM_COUNT; b++) {
+    if (itemsBefore[b] != 0) {
+      if (AddItemToConvoy(itemsBefore[b]) == -1) {
+        // No more room in supply for item.
+        // FIXME, add debug printing, we're not supposed to get here!
+        ;
+      }
+    }
+  }
 }
 
 // Track when a unit equips a different item.
@@ -168,8 +298,8 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   inventoryReorder = (struct REW_InventoryReorder*)entry->data;
   
   // Track unit's X and Y.
-  inventoryReorder->x = gActiveUnitMoveOrigin.x;
-  inventoryReorder->y = gActiveUnitMoveOrigin.y;
+  inventoryReorder->x = unit->xPos;
+  inventoryReorder->y = unit->yPos;
   
   // Setup default inventory order.
   inventoryReorderFlags->item1Pos = 1;      // This item is guaranteed to have moved one down.
@@ -195,14 +325,18 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
 
 // Track when a unit obtains an item.
 //  - wasItemObtainedSuccessfully is the return value of UnitAddItem
-//    which is called prior to this function. If this value is false
+//    which is sometimes called prior to this function. If this value is false
 //    we don't track but return immediately.
 void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtainedSuccessfully) {
   struct REW_RewindEntry* entry;
-  struct REW_ItemObtainedUnit* itemObtainedUnit;
+  struct REW_ItemUnit* itemUnit;
   
   // If we are in preparations nothing to track; Return.
   if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If we are in world map nothing to track; Return.
+  if (WM_Exists())
     return;
   
   // If item was not obtained (UnitAddItem returned false)
@@ -225,14 +359,168 @@ void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtaine
     return;
   
   entry->diffType = REW_CONSEQ_ITEMOBTAINED_UNIT;
-  itemObtainedUnit = (struct REW_ItemObtainedUnit*)entry->data;
+  itemUnit = (struct REW_ItemUnit*)entry->data;
   
   // Track unit's X and Y.
-  itemObtainedUnit->x = gActiveUnit->xPos;
-  itemObtainedUnit->y = gActiveUnit->yPos;
+  itemUnit->x = gActiveUnit->xPos;
+  itemUnit->y = gActiveUnit->yPos;
   
   // Track item.
-  itemObtainedUnit->item = item;
+  itemUnit->item = item;
+  
+  // Align rewindEntry.
+  REW_alignEntry();
+}
+
+// Track when a unit loses an item.
+void REW_conseqItemRemovedUnit(struct Unit* unit, u16 item) {
+  struct REW_RewindEntry* entry;
+  struct REW_ItemUnit* itemUnit;
+  
+  // If we are in preparations nothing to track; Return.
+  if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If we are in world map nothing to track; Return.
+  if (WM_Exists())
+    return;
+  
+  // If unit is not valid, return.
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // If unit has no HP (unit is being loaded),
+  // don't track; Return.
+  if (unit->curHP == 0)
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_ITEMREMOVED_UNIT.
+  entry = REW_mallocNewRewindEntry(REW_CONSEQ_ITEMREMOVED_UNIT_SIZE);
+  if (entry == NULL)
+    return;
+  
+  entry->diffType = REW_CONSEQ_ITEMREMOVED_UNIT;
+  itemUnit = (struct REW_ItemUnit*)entry->data;
+  
+  // Track unit's X and Y.
+  itemUnit->x = gActiveUnit->xPos;
+  itemUnit->y = gActiveUnit->yPos;
+  
+  // Track item.
+  itemUnit->item = item;
+  
+  // Align rewindEntry.
+  REW_alignEntry();
+}
+
+// Track when an item is sent to supply.
+void REW_conseqItemObtainedSupply(u16 item) {
+  struct REW_RewindEntry* entry;
+  u16* rewindEntryItem;
+  
+  // If we are in preparations nothing to track; Return.
+  if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If we are in world map nothing to track; Return.
+  if (WM_Exists())
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_ITEMOBTAINED_SUPPLY.
+  entry = REW_mallocNewRewindEntry(REW_CONSEQ_ITEMOBTAINED_SUPPLY_SIZE);
+  if (entry == NULL)
+    return;
+  entry->diffType = REW_CONSEQ_ITEMOBTAINED_SUPPLY;
+  
+  // Track item.
+  rewindEntryItem = (u16*)entry->data;
+  rewindEntryItem[0] = item;
+  
+  // Align rewindEntry.
+  REW_alignEntry();
+}
+
+// Track when an item is removed from supply.
+void REW_conseqItemRemovedSupply(u16 item) {
+  struct REW_RewindEntry* entry;
+  u16* rewindEntryItem;
+  
+  // If we are in preparations nothing to track; Return.
+  if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If we are in world map nothing to track; Return.
+  if (WM_Exists())
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_ITEMREMOVED_SUPPLY.
+  entry = REW_mallocNewRewindEntry(REW_CONSEQ_ITEMREMOVED_SUPPLY_SIZE);
+  if (entry == NULL)
+    return;
+  entry->diffType = REW_CONSEQ_ITEMREMOVED_SUPPLY;
+  
+  // Track item.
+  rewindEntryItem = (u16*)entry->data;
+  rewindEntryItem[0] = item;
+  
+  // Align rewindEntry.
+  REW_alignEntry();
+}
+
+// Take a snapshot of a unit's inventory before they open supply.
+// This will allow us to track how their inventory changes after they've
+// interacted with the supply.
+void REW_conseqSupplyWriteInventorySnapshot(struct Unit* unit, u16* snapshotPtr) {
+  int i;
+  
+  // Take the snapshot (copy unit inventory).
+  for (i = 0; i < UNIT_ITEM_COUNT; i++)
+    snapshotPtr[i] = unit->items[i];
+}
+
+// Track how a unit's inventory has changed after they've interacted with the supply
+// by comparing their current inventory to a snapshot taken prior.
+void REW_conseqSupplyTrackInventoryChanges(struct Unit* unit, u16* snapshotPtr) {
+  struct REW_RewindEntry* entry;
+  struct REW_UnitSupplyExchange* unitSupplyExchange;
+  bool didInventoryChange = false;
+  int i;
+  
+  // If we are in preparations nothing to track; Return.
+  if (PrepAtMenuExists(NULL))
+    return;
+  
+  // If we are in world map nothing to track; Return.
+  if (WM_Exists())
+    return;
+  
+  // If snapshot and current inventory are the same, return.
+  for (i = 0; i < UNIT_ITEM_COUNT; i++) {
+    if (unit->items[i] != snapshotPtr[i]) {
+      didInventoryChange = true;
+      break;
+    }
+  }
+  if (!didInventoryChange)
+    return;
+  
+  // Create new RewindEntry for REW_CONSEQ_UNITSUPPLYEXCHANGE.
+  entry = REW_mallocNewRewindEntry(REW_CONSEQ_UNITSUPPLYEXCHANGE_SIZE);
+  if (entry == NULL)
+    return;
+  entry->diffType = REW_CONSEQ_UNITSUPPLYEXCHANGE;
+  unitSupplyExchange = (struct REW_UnitSupplyExchange*)entry->data;
+  
+  // Track unit's X and Y.
+  unitSupplyExchange->x = gActiveUnit->xPos;
+  unitSupplyExchange->y = gActiveUnit->yPos;
+  
+  // Track inventory before and after supply exchange.
+  unitSupplyExchange = (struct REW_UnitSupplyExchange*)entry->data;
+  for (i = 0; i < UNIT_ITEM_COUNT; i++) {
+    unitSupplyExchange->itemsBefore[i] = snapshotPtr[i];
+    unitSupplyExchange->itemsAfter[i] = unit->items[i];
+  }
   
   // Align rewindEntry.
   REW_alignEntry();

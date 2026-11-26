@@ -6,7 +6,7 @@
 enum {
   
   // Sizes.
-  REW_ACTION_CHESTOPENED_SIZE = 4,
+  REW_ACTION_CHESTOPENED_SIZE = 2,
   
 };
 

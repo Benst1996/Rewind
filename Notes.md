@@ -20,17 +20,31 @@ A unit's item inventory can change by means of:
   - Discarding an item. This action is free.
   - Defeating an enemy that drops an item.
   - Stealing from an enemy.
+  - Being stolen from by an enemy.
   - Unlocking a chest.
   - Trading (blue units) with another unit (blue or green).
   - Trading with the supply.
+  - Using an item (staves, vulneraries, promotion items, metis tome, etc.)
   - Maybe more I haven't thought of.
   
 Note that equipping and discarding items can be done freely without forcing the unit to commit to any move. This means a rewind sequence can start with one of these actions. The action will not be saved, just like the sequence at this point, so no harm no foul. Just something to keep in mind.
 
 One idea to track item inventory changes is to plant hooks in UnitAddItem, AddItemToConvoy, UnitRemoveItem and RemoveItemFromConvoy (the big 4). Problem is that there are awkward exceptions:
   - LoadUnit will add items by calling UnitAddItem, which would result in tracking the items twice, wasting space. Technically this issue can be avoided by not tracking in UnitAddItem if unit has 0 HP as the loaded unit at this point will have 0 HP. This also works for gorgon eggs (they're initialized with 5 hp).
-  - PrepItemSupply_GiveItemToSupply (which is not just used in preps, but when a unit interacts with the supply, even during a chapter) doesn't actually call UnitRemoveItem, but manually removes the item.
-  - Others I may not be aware of.
+  
+  - Places where items get removed/altered without UnitRemoveItem being called:
+  
+    - WmSell_ConfirmSellItem. Executes when selling (not to a shop) an item on the world map. Selling to a shop does call UnitRemoveItem!
+    
+    - sub_809F498. Seemingly unused?
+    
+    - sub_809FB70. When exchanging with supply/others via the list functionality. Shouldn't be relevant to us.
+    
+    - sub_809E2C8. When taking from supply. Basically the opposite of the one below. This and below can happen on WM so check PrepAtExists and WM_exists.
+    
+    - PrepItemSupply_GiveItemToSupply (which is not just used in preps, but when a unit interacts with the supply, even during a chapter) doesn't actually call UnitRemoveItem, but manually removes the item.
+    
+    - Others I may not be aware of.
 
 Conversely I could hook at all the different actions that result in a unit's inventory and the convoy's inventory being changed instead of the big 4. More control. Already have a few ORGS following this idea written in src/asm/conseqs/conseqs.event. Also makes it easier to merge certain changes like a unit storing an item in the convoy. This should only require one entry saving the item (and the inventory slot of the unit, not convoy as we don't care about the order of items in the convoy) instead of one entry for removing the item from the unit and another for adding it to the convoy.
 

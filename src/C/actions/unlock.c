@@ -14,10 +14,6 @@ void REW_undoChestOpened(struct REW_RewindEntry* entry) {
   unitID = gBmMapUnit[chestOpened->y][chestOpened->x];
   unit = GetUnit(unitID);
   
-  // Move actor to original position.
-  unit->xPos = chestOpened->xPrev;
-  unit->yPos = chestOpened->yPrev;
-  
   // Re-enable selecting unit.
   unit->state &= ~US_UNSELECTABLE;
   
@@ -38,12 +34,8 @@ void REW_redoChestOpened(struct REW_RewindEntry* entry) {
   int item;
   
   // Find actor.
-  unitID = gBmMapUnit[chestOpened->yPrev][chestOpened->xPrev];
+  unitID = gBmMapUnit[chestOpened->y][chestOpened->x];
   unit = GetUnit(unitID);
-  
-  // Move actor to new position.
-  unit->xPos = chestOpened->x;
-  unit->yPos = chestOpened->y;
   
   // Disable selecting unit.
   unit->state |= US_UNSELECTABLE;
@@ -78,8 +70,6 @@ void REW_actionOpenChest(u8 itemSlot) {
   
   // Track X, Y.
   chestOpened = (struct REW_ChestOpened*)entry->data;
-  chestOpened->xPrev = gActiveUnitMoveOrigin.x;
-  chestOpened->yPrev = gActiveUnitMoveOrigin.y;
   chestOpened->x = gActiveUnit->xPos;
   chestOpened->y = gActiveUnit->yPos;
   

@@ -7,16 +7,14 @@ enum {
   
   // Sizes.
   REW_ENTRY_INVENTORYREORDER_SIZE =   2,
-  REW_CONSEQ_ITEMOBTAINED_UNIT_SIZE = 4,
   
-};
-
-// Rewind entry data.
-// Tracks when a unit obtained an item.
-struct REW_ItemObtainedUnit {
-  /* 00 */ s8 x;
-  /* 01 */ s8 y;
-  /* 02 */ u16 item;
+  REW_CONSEQ_ITEMOBTAINED_UNIT_SIZE = 4,
+  REW_CONSEQ_ITEMREMOVED_UNIT_SIZE = 4,
+  REW_CONSEQ_ITEMOBTAINED_SUPPLY_SIZE = 2,
+  REW_CONSEQ_ITEMREMOVED_SUPPLY_SIZE = 2,
+  
+  REW_CONSEQ_UNITSUPPLYEXCHANGE_SIZE = UNIT_ITEM_COUNT * 2 * 2,
+  
 };
 
 // Rewind entry data.
@@ -25,6 +23,25 @@ struct REW_ItemObtainedUnit {
 struct REW_InventoryReorder {
   /* 00 */ s8 x;
   /* 01 */ s8 y;
+};
+
+// Rewind entry data.
+// Tracks when a unit obtained/lost an item.
+struct REW_ItemUnit {
+  /* 00 */ s8 x;
+  /* 01 */ s8 y;
+  /* 02 */ u16 item;
+};
+
+// Tracks the exchange of items between units and
+// supply whenever a unit accesses the supply by
+// storing the inventory of the unit before
+// and after the exchange.
+struct REW_UnitSupplyExchange {
+  /* 00 */ s8 x;
+  /* 01 */ s8 y;
+  /* 02 */ u16 itemsBefore[UNIT_ITEM_COUNT];
+  /* 0C */ u16 itemsAfter[UNIT_ITEM_COUNT];
 };
 
 // rewindEntry flags for an REW_InventoryReorder
@@ -46,8 +63,17 @@ void REW_redoItemRemovedUnit(struct REW_RewindEntry* entry);
 void REW_redoItemObtainedSupply(struct REW_RewindEntry* entry);
 void REW_redoItemRemovedSupply(struct REW_RewindEntry* entry);
 
+void REW_undoUnitSupplyExchange(struct REW_RewindEntry* entry);
+void REW_redoUnitSupplyExchange(struct REW_RewindEntry* entry);
+
 void REW_conseqEquipItem(struct Unit* unit, int itemSlot);
 void REW_conseqItemObtainedUnit(struct Unit* unit, u16 item, bool wasItemObtainedSuccessfully);
+void REW_conseqItemRemovedUnit(struct Unit* unit, u16 item);
+void REW_conseqItemObtainedSupply(u16 item);
+void REW_conseqItemRemovedSupply(u16 item);
+
+void REW_conseqSupplyWriteInventorySnapshot(struct Unit* unit, u16* snapshotPtr);
+void REW_conseqSupplyTrackInventoryChanges(struct Unit* unit, u16* snapshotPtr);
 
 void REW_undoItemObtained(struct REW_RewindSequence* sequence, struct REW_RewindEntry* entry);
 void REW_redoItemObtained(struct REW_RewindSequence* sequence, struct REW_RewindEntry* entry);

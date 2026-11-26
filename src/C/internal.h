@@ -32,6 +32,7 @@ enum {
   REW_BUFFER_BASESIZE = 8,
   REW_SEQUENCE_BASESIZE = 4,
   REW_ENTRY_BASESIZE = 4,
+  REW_SEQUENCE_BUFFER_SIZE = 0x300,   // We ASSUME this is at least as big as REW_curSequenceMaxSize
   
   REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE = 2,
   REW_ENTRY_UNITDATA_BASESIZE = 2,
@@ -42,14 +43,19 @@ enum {
   // such as UNIT_ACTION_COMBAT as given in FEClib's action.h.
   REW_ACTION_PHASECHANGE =         0x40,
   REW_ACTION_BREAK =               0x41,
+  
   REW_CONSEQ_UNITCHANGE =          0x42,
   REW_CONSEQ_UNITLOAD_INIT =       0x43,
   REW_CONSEQ_UNITLOAD_FINAL =      0x44,
+  
   REW_CONSEQ_INVENTORYREORDER =    0x45,
   REW_CONSEQ_ITEMOBTAINED_UNIT =   0x46,
   REW_CONSEQ_ITEMREMOVED_UNIT =    0x47,
   REW_CONSEQ_ITEMOBTAINED_SUPPLY = 0x48,
   REW_CONSEQ_ITEMREMOVED_SUPPLY =  0x49,
+  REW_CONSEQ_UNITSUPPLYEXCHANGE =  0x4A,
+  
+  REW_CONSEQ_UNITMOVE =            0x4B,
   
   // Obstacle flags.
   REW_OBSTACLE_SNAG = 0x1,
@@ -84,10 +90,8 @@ struct REW_RewindEntry {
 // Most actions' rewindEntry->data will start
 // with these. Exceptions: combat & phaseChange.
 #define REW_ACTION_REWINDENTRYDATA_HEADER \
-  /* 00 */ s8 xPrev;                      \
-  /* 01 */ s8 yPrev;                      \
-  /* 02 */ s8 x;                          \
-  /* 03 */ s8 y;                          \
+  /* 00 */ s8 x;                          \
+  /* 01 */ s8 y;                          \
 
 // Rewind sequence. Action + consequences.
 struct REW_RewindSequence {
@@ -134,6 +138,7 @@ struct REW_UnitDefData {
 
 void REW_clearRewindSeq(struct REW_RewindSequence* sequence);
 bool REW_isSequenceEmpty(struct REW_RewindSequence* sequence);
+void REW_deleteRewindEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_mallocNewRewindEntry(u16 size);
 bool REW_mallocSize(struct REW_RewindEntry* entry, u16 size);
 void REW_alignEntry();
@@ -150,6 +155,7 @@ void REW_getCoordinateDifference(struct REW_UnitChangeData* unitChangeData, u16 
 u8 REW_getUnitID(struct REW_UnitData* unitData, u16 size, u8 mode);
 void REW_hideRoofedUnits();
 void REW_loadUnit(struct Unit* unit, struct REW_UnitDefData* unitDefData, s8 x, s8 y);
+int REW_removeItemFromSupply(u16 item);
 
 extern const u16* REW_rewindMaxSize;
 extern const u16* REW_curSequenceMaxSize;

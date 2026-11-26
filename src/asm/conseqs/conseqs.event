@@ -11,7 +11,21 @@ PUSH
       SHORT 0x0       // NOP
       jumpToHack(REW_hookEnun)
       SHORT 0x0       // NOP
-
+  
+  // Unit movement.
+    
+    // Playerphase move unit.
+    ORG 0x1D470     // PlayerPhase_ApplyUnitMovement
+      jumpToHack(REW_hookPlayerPhaseUnitMove)
+    
+    // Playerphase cancel unitmovement.
+    ORG 0x1D008     // PlayerPhase_BackToMove
+      jumpToHack(REW_hookPlayerPhaseCancelUnitMove)
+    
+    // Other phases.
+    ORG 0x39C20     // AiSetDecision.
+      // TODO
+  
   // Track item inventory changes.
   
     // Unit inventory reordering.
@@ -24,10 +38,23 @@ PUSH
     ORG 0x17948
       jumpToHack(REW_hookItemObtained)
     
+    // Track whenever an item is taken from supply by a unit.
+    //ORG 0x9E324
+      //callHack_r3(REW_hookItemTakenFromSupply)
+      //SHORT 0x0       // NOP
     
+    // Track whenever an item is given to supply by a unit.
+    //ORG 0x9E87C
+      //callHack_r3(REW_hookItemGivenToSupply)
+      //SHORT 0x0       // NOP
+
+    // Take a snapshot of a unit's inventory before they interact with supply.
+    ORG 0x9EB38
+      jumpToHack(REW_hookSupplyTakeSnapshot)
     
-
-
+    // Compare unit's inventory to prior snapshot and track the two inventories.
+    ORG 0x9EA7C
+      jumpToHack(REW_hookSupplyTrackInventories)
     
   
     // Item obtained through loot-drop, event or chest.
@@ -91,3 +118,4 @@ POP
 
 ALIGN 4; #include "loadUnit.lyn.event"
 ALIGN 4; #include "item.lyn.event"
+ALIGN 4; #include "move.lyn.event"

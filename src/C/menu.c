@@ -98,9 +98,10 @@ void REW_displayActor(struct REW_ProcState* proc, struct REW_RewindEntry* rewind
   } else {
     
     // For every other action we assume data is
-    // headed by REW_ACTION_REWINDENTRYDATA_HEADER.
-    x = rewindEntry->data[2];
-    y = rewindEntry->data[3];
+    // headed by REW_ACTION_REWINDENTRYDATA_HEADER
+    // which means the first two bytes are the unit's coordinates.
+    x = rewindEntry->data[0];
+    y = rewindEntry->data[1];
     
     // Find unit.
     unitID = gBmMapUnit[y][x];
@@ -452,6 +453,10 @@ void REW_handleInput(struct REW_ProcState* proc) {
     // redo that sequence too.
     if (!REW_isSequenceEmpty(REW_curSequence))
       REW_redo(REW_curSequence);
+    
+    // Refresh units.
+    RefreshEntityBmMaps();
+    RefreshUnitSprites();
     
     // Move procScript to endProc.
     Proc_Goto(proc, 3);

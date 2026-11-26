@@ -12,6 +12,49 @@ bool REW_isSequenceEmpty(struct REW_RewindSequence* sequence) {
   return (sequence->size == 0);
 }
 
+// Deletes a given rewindEntry from the given rewindSequence.
+// Then refactors the sequence: 012345 -> 012*45 -> 01245.
+// Assumes the entry is part of said sequence.
+void REW_deleteRewindEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry) {
+  struct REW_RewindEntry* entryIt;
+  int entrySize, entryItSize, align, it = 0;
+  
+  // Allocate buffer for remaining rewindEntries.
+  u8 newSequenceTail[REW_SEQUENCE_BUFFER_SIZE];
+  
+  // Copy entries after given entry over to separate buffer.
+  entrySize = entry->size;
+  entryIt = REW_nextEntry(seq, entry);
+  while (entryIt != NULL) {
+    
+    // 4 align the size of the entry.
+    entryItSize = entryIt->size;
+    align = entryItSize & 3;
+    if (align)
+      entryItSize += 4 - align;
+    
+    // Copy rewindEntry to buffer.
+    CpuCopy32((void*)entryIt, &newSequenceTail[it], entryItSize);
+    
+    it += entryItSize;
+    entryIt = REW_nextEntry(seq, entryIt);
+  }
+  
+  // If we find no entries past the
+  // unitMove rewindEntry, then nothing to refactor.
+  if (it <= 0)
+    return;
+  
+  // Copy buffer to rewindSequence.
+  CpuCopy32(&newSequenceTail[0], (void*)entry, it);
+  
+  // Adjust rewindSequence buffer size.
+  align = entrySize & 3;
+  if (align)
+    entrySize += 4 - align;
+  seq->size -= entrySize;
+}
+
 // Adds a new rewindEntry to the rewindSequence, REW_curSequence.
 // Returns pointer to new rewindEntry or
 // NULL if no more space is available in the rewindSequence.
@@ -121,7 +164,8 @@ struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence)
          (u32)sequence->sizePrev);
 }
 
-// Given a rewind-entry, return the next entry of the sequence.
+// Given a rewind-entry, return the next entry of the sequence
+// or return NULL if there is no next entry.
 struct REW_RewindEntry* REW_nextEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry) {
   u16 size = entry->size;
   int align = size & 3;
@@ -284,4 +328,26 @@ void REW_loadUnit(struct Unit* unit, struct REW_UnitDefData* unitDefData, s8 x, 
   
   // Set index to reflect faction.
   unit->index = unitDef.allegiance << 6;
+}
+
+// Vanilla's RemoveItemFromConvoy requires an index
+// and GetConvoyItemSlot doesn't care about the item's uses
+// so we need to make a function for our needs.
+//
+// Removes the item from supply and returns 0.
+// If item isn't in supply, return -1 instead.
+int REW_removeItemFromSupply(u16 item) {
+  int i;
+  u16* supply = GetConvoyItemArray();
+  
+  // Find item in supply.
+  for (i = 0; i < CONVOY_ITEM_COUNT; i++) {
+    if (supply[i] == item) {
+      supply[i] = 0;
+      return 0;
+    }
+  }
+  
+  // Couldn't find item.
+  return -1;
 }

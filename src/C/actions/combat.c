@@ -110,7 +110,7 @@ void REW_undoCombat(struct REW_RewindEntry* entry) {
     // Data after supports is REW_UnitData.
     unitData = (struct REW_UnitData*)(entry->data + unitSupporterCount);
     
-    // Place unit where they were before moving.
+    // Place unit where they were after moving.
     unit->xPos = unitData->x;
     unit->yPos = unitData->y;
     
@@ -130,9 +130,8 @@ void REW_undoCombat(struct REW_RewindEntry* entry) {
     if (!UNIT_IS_VALID(unit)) return;
   }
   
-  s8 xCur = unit->xPos;
-  s8 yCur = unit->yPos;
-  changeCount /= 2;         // Change is offs and diff, so size / 2.
+  // Change is offs and diff, so size / 2.
+  changeCount /= 2;
   
   // Undo changes applied to unit due to combat.
   unitArr = (u8*)unit;
@@ -165,9 +164,7 @@ void REW_undoCombat(struct REW_RewindEntry* entry) {
     }
   }
   
-  // Move unit back to their position before they entered combat.
-  // If unit died this ends up clearing and then setting the same location.
-  gBmMapUnit[yCur][xCur] = 0;
+  // Add unit to unit map in case they were cleared.
   gBmMapUnit[unit->yPos][unit->xPos] = unit->index;
 }
 
@@ -196,6 +193,9 @@ void REW_redoCombat(struct REW_RewindEntry* entry) {
       unit->pCharacterData = NULL;
     }
     
+    // Clear unit from unitMap.
+    gBmMapUnit[unitData->y][unitData->x] = 0;
+    
     // REW_UnitDefData are not unitChangeData, so remove from changeCount.
     changeCount -= REW_ENTRY_UNITDEFDATA_SIZE;
     
@@ -220,6 +220,9 @@ void REW_redoCombat(struct REW_RewindEntry* entry) {
     // Data after supports is REW_UnitChangeData.
     unitData = (struct REW_UnitData*)(entry->data + unitSupporterCount);
     
+    // Clear unit from unitMap.
+    gBmMapUnit[unitData->y][unitData->x] = 0;
+    
     // support array is not unitChangeData, so remove from changeCount.
     changeCount -= unitSupporterCount;
   
@@ -236,9 +239,8 @@ void REW_redoCombat(struct REW_RewindEntry* entry) {
     if (!UNIT_IS_VALID(unit)) return;
   }
   
-  s8 xPrev = unit->xPos;
-  s8 yPrev = unit->yPos;
-  changeCount /= 2;         // Change is offs and diff, so size / 2.
+  // Change is offs and diff, so size / 2.
+  changeCount /= 2;
   
   // Redo changes applied to unit due to combat.
   unitArr = (u8*)unit;
@@ -271,11 +273,6 @@ void REW_redoCombat(struct REW_RewindEntry* entry) {
       GetTrap(unit->ballistaIndex)->data[TRAP_EXTDATA_BLST_ITEMUSES] += unitData->unitChangeData[i].diff;
     }
   }
-  
-  // Move unit back to their position after they finished combat.
-  // If unit died this ends up setting and then clearing the same location.
-  gBmMapUnit[unit->yPos][unit->xPos] = unit->index;
-  gBmMapUnit[yPrev][xPrev] = 0;
 }
 
 // Returns updated version of what bu's BWL data would be after battle.
@@ -378,8 +375,6 @@ struct UnitUsageStats REW_applyBWLChanges(struct BattleUnit* bu) {
 void REW_storeCombatData(struct Unit* unit,
                          struct BattleUnit* bu,
                          u32 postCombatStateMask,
-                         s8 xPrev,
-                         s8 yPrev,
                          struct REW_RewindSequence* rewindSeq,
                          struct REW_RewindEntry* rewindEntry) {
   struct Unit buCopy;
@@ -438,34 +433,10 @@ void REW_storeCombatData(struct Unit* unit,
   
   //  - X and Y position.
   unitData = (struct REW_UnitData*)rewindEntry->data;
-  unitData->x = xPrev;
-  unitData->y = yPrev;
+  unitData->x = unit->xPos;
+  unitData->y = unit->yPos;
   
   // Now store changes of unit.
-  //  - Position changes.
-  diff = buCopy.xPos - xPrev;
-  if (diff) {
-    
-    // Allocate space for unitChangeData element.
-    if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
-      return;
-    
-    unitData->unitChangeData[changeIdx].offs = 0x10;
-    unitData->unitChangeData[changeIdx].diff = diff;
-    changeIdx += 1;
-  }
-  diff = buCopy.yPos - yPrev;
-  if (diff) {
-    
-    // Allocate space for unitChangeData element.
-    if (!REW_mallocSize(rewindEntry, REW_ENTRY_UNITCHANGEDATA_ELEMENTSIZE))
-      return;
-    
-    unitData->unitChangeData[changeIdx].offs = 0x11;
-    unitData->unitChangeData[changeIdx].diff = diff;
-    changeIdx += 1;
-  }
-  
   //  - Generic changes.
   for (i = 0; i < REW_UNITSIZE; i++) {
     diff = unitPost[i] - unitPre[i];
@@ -539,8 +510,6 @@ void REW_storeCombatData(struct Unit* unit,
 void REW_storeCombatDataDead(struct Unit* unit,
                              struct BattleUnit* bu,
                              u32 postCombatStateMask,
-                             s8 xPrev,
-                             s8 yPrev,
                              struct REW_RewindSequence* rewindSeq,
                              struct REW_RewindEntry* rewindEntry) {
   struct UnitUsageStats* bwlPre;
@@ -582,8 +551,8 @@ void REW_storeCombatDataDead(struct Unit* unit,
     
     // Set unitData to be after supports.
     unitData = (struct REW_UnitData*)((u32)supports + unitSupporterCount);
-    unitData->x = xPrev;
-    unitData->y = yPrev;
+    unitData->x = unit->xPos;
+    unitData->y = unit->yPos;
     
     // Copy unit.
     CpuCopy32(unit, &referenceUnit, REW_UNITSIZE);
@@ -607,8 +576,8 @@ void REW_storeCombatDataDead(struct Unit* unit,
     
     // Set unitData to be after unitDefData.
     unitData = (struct REW_UnitData*)((u32)unitDefData + (u32)REW_ENTRY_UNITDEFDATA_SIZE);
-    unitData->x = xPrev;
-    unitData->y = yPrev;
+    unitData->x = unit->xPos;
+    unitData->y = unit->yPos;
     
     // Build unitDefData.
     unitDefData->charIndex =          unit->pCharacterData->number;
@@ -717,8 +686,6 @@ void REW_actionCombat() {
     REW_storeCombatDataDead(actor,
                             &gBattleActor,
                             US_HIDDEN | US_UNSELECTABLE | US_DEAD,
-                            (s8)gActiveUnitMoveOrigin.x,
-                            (s8)gActiveUnitMoveOrigin.y,
                             rewindSeq,
                             rewindEntry);
     
@@ -729,8 +696,6 @@ void REW_actionCombat() {
     REW_storeCombatData(actor,
                         &gBattleActor,
                         US_HIDDEN | US_UNSELECTABLE,
-                        (s8)gActiveUnitMoveOrigin.x,
-                        (s8)gActiveUnitMoveOrigin.y,
                         rewindSeq,
                         rewindEntry);
   }
@@ -755,16 +720,12 @@ void REW_actionCombat() {
       REW_storeCombatDataDead(target,
                               &gBattleTarget,
                               US_HIDDEN | US_DEAD,
-                              target->xPos,
-                              target->yPos,
                               rewindSeq,
                               rewindEntry);
     } else {
       REW_storeCombatData(target,
                           &gBattleTarget,
                           0,
-                          target->xPos,
-                          target->yPos,
                           rewindSeq,
                           rewindEntry);
     }

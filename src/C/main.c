@@ -36,9 +36,20 @@ void REW_undo(struct REW_RewindSequence* sequence) {
         REW_undoCombat(entry);
         break;
       
+      // Unit movement.
+      case REW_CONSEQ_UNITMOVE:
+        REW_undoUnitMove(entry);
+        break;
+      
+      // Unit loading.
       case REW_CONSEQ_UNITLOAD_INIT:
       case REW_CONSEQ_UNITLOAD_FINAL:
         REW_undoLoadUnit(entry);
+        break;
+      
+      // Inventory reorder (equipping/discarding/obtaining an item).
+      case REW_CONSEQ_INVENTORYREORDER:
+        REW_doInventoryReorder(entry, true);
         break;
       
       // Item obtained by unit.
@@ -61,9 +72,9 @@ void REW_undo(struct REW_RewindSequence* sequence) {
         REW_undoItemRemovedSupply(entry);
         break;
       
-      // Inventory reorder (equipping/discarding/obtaining an item).
-      case REW_CONSEQ_INVENTORYREORDER:
-        REW_doInventoryReorder(entry, true);
+      // Unit exchanging items with supply.
+      case REW_CONSEQ_UNITSUPPLYEXCHANGE:
+        REW_undoUnitSupplyExchange(entry);
         break;
       
       default:
@@ -103,9 +114,20 @@ void REW_redo(struct REW_RewindSequence* sequence) {
         REW_redoCombat(entry);
         break;
       
+      // Unit movement.
+      case REW_CONSEQ_UNITMOVE:
+        REW_redoUnitMove(entry);
+        break;
+      
+      // Unit loading.
       case REW_CONSEQ_UNITLOAD_INIT:
       case REW_CONSEQ_UNITLOAD_FINAL:
         REW_redoLoadUnit(entry);
+        break;
+      
+      // Inventory reorder (equipping/discarding/obtaining an item).
+      case REW_CONSEQ_INVENTORYREORDER:
+        REW_doInventoryReorder(entry, false);
         break;
       
       // Item obtained by unit.
@@ -128,9 +150,9 @@ void REW_redo(struct REW_RewindSequence* sequence) {
         REW_redoItemRemovedSupply(entry);
         break;
       
-      // Inventory reorder (equipping/discarding/obtaining an item).
-      case REW_CONSEQ_INVENTORYREORDER:
-        REW_doInventoryReorder(entry, false);
+      // Unit exchanging items with supply.
+      case REW_CONSEQ_UNITSUPPLYEXCHANGE:
+        REW_redoUnitSupplyExchange(entry);
         break;
       
       default:
