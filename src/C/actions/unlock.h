@@ -11,8 +11,8 @@ enum {
 };
 
 // Rewind entry data.
-// Tracks unit's x and y before
-// they open chest and after.
+// Tracks unit's x and y when
+// they open a chest.
 struct REW_ChestOpened {
   REW_ACTION_REWINDENTRYDATA_HEADER
 };

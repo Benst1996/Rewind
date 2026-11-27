@@ -1,6 +1,7 @@
 // Hooks to different consequences (events, but other things as well)
 // that can happen/run as a result of actions.
 // Idea is to store these in rewind buffer so they can be rewound.
+#define jumpToHack_r4(offset) "BYTE 0x00 0x4C 0x20 0x47; POIN (offset|0x1)"
 
 PUSH
 
@@ -22,9 +23,9 @@ PUSH
     ORG 0x1D008     // PlayerPhase_BackToMove
       jumpToHack(REW_hookPlayerPhaseCancelUnitMove)
     
-    // Other phases.
-    ORG 0x39C20     // AiSetDecision.
-      // TODO
+    // Other phases move unit.
+    ORG 0x39C24     // AiSetDecision.
+      jumpToHack_r4(REW_hookOtherPhaseUnitMove)
   
   // Track item inventory changes.
   

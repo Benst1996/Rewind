@@ -58,19 +58,24 @@ void REW_conseqFinalizeUnits() {
   if (REW_curSequence->size == 0)
     return;
   
+  // Find all prior REW_CONSEQ_UNITLOAD_INIT rewindEntries.
+  entry = REW_findEntry(REW_curSequence, entry, REW_CONSEQ_UNITLOAD_INIT);
   while (entry != NULL) {
-    if (entry->diffType == REW_CONSEQ_UNITLOAD_INIT) {
-      unit = GetUnit(entry->flags);
-      if (UNIT_IS_VALID(unit)) {
-        entry->diffType = REW_CONSEQ_UNITLOAD_FINAL;
-        
-        unitDefData = (struct UnitDefinition*)entry->data;
-        unitDefData->xPosition = unit->xPos;
-        unitDefData->yPosition = unit->yPos;
-        unitDefData->redaCount = 0;
-        unitDefData->redas = NULL;
-      }
+    
+    // Set unit's position to final position.
+    unit = GetUnit(entry->flags);
+    if (UNIT_IS_VALID(unit)) {
+      entry->diffType = REW_CONSEQ_UNITLOAD_FINAL;
+      
+      unitDefData = (struct UnitDefinition*)entry->data;
+      unitDefData->xPosition = unit->xPos;
+      unitDefData->yPosition = unit->yPos;
+      unitDefData->redaCount = 0;
+      unitDefData->redas = NULL;
     }
+    
+    // Iterate.
     entry = REW_nextEntry(REW_curSequence, entry);
+    entry = REW_findEntry(REW_curSequence, entry, REW_CONSEQ_UNITLOAD_INIT);
   }
 }

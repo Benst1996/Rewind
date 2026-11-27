@@ -1,42 +1,86 @@
 #include <stdio.h>
 #include "item.h"
 
-// Undo or redo a reordering of a unit's inventory.
-// bool undo is true if undoing the reorder, false if redoing the reorder.
-void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo) {
-  struct REW_InventoryReorder* inventoryReorder;
-  struct REW_InventoryReorderFlags* inventoryReorderFlags;
-  s8 unitID;
-  struct Unit* unit;
+// Given a before- and after-inventory, this function
+// will generate the matrix that can be used to
+// transition from one to the other (REW_ReorderPositions).
+struct REW_ReorderPositions REW_createReorderPositions(u16* inventoryBefore, u16* inventoryAfter) {
+  int i, j, k, l;
   u8 inventorySlotAvailabilityMask = 0;
-  u16 items[UNIT_ITEM_COUNT];
+  struct REW_ReorderPositions reorderPositions = {0, 0, 0, 0};
+  u16 inventoryAfterCopy[UNIT_ITEM_COUNT] = {inventoryAfter[0],
+                                             inventoryAfter[1],
+                                             inventoryAfter[2],
+                                             inventoryAfter[3],
+                                             inventoryAfter[4]};
+  
+  // Build the transitionMatrix (REW_ReorderPositions).
+  for (i = 0; i < UNIT_ITEM_COUNT; i++) {
+    for (j = 0; j < UNIT_ITEM_COUNT; j++) {
+      
+      // If matching item has been found.
+      if (inventoryBefore[i] == inventoryAfterCopy[j]) {
+        
+        // Hard to document how this exactly works.
+        k = 0;
+        l = 0;
+        while (k != j) {
+          
+          // if slot is open.
+          if (!(inventorySlotAvailabilityMask & (1 << k)))
+            l++;
+          
+          k++;
+        }
+        
+        inventorySlotAvailabilityMask |= (1 << j);
+        
+        // To ensure duplicate items don't throw things off,
+        // we replace filled slots with special code 0xFFFF.
+        inventoryAfterCopy[j] = 0xFFFF;
+        
+        if (i == 0)
+          reorderPositions.item1Pos = l;
+        if (i == 1)
+          reorderPositions.item2Pos = l;
+        else if (i == 2)
+          reorderPositions.item3Pos = l;
+        else if (i == 3)
+          reorderPositions.item4Pos = l;
+        
+        break;
+      }
+    }
+    
+    if (j >= UNIT_ITEM_COUNT) {
+      // We should only get here if there's X number of some item
+      // in inventoryBefore and less than X of that item in inventoryAfter.
+      // FIXME, add debug printing, we're not supposed to get here!
+      return (struct REW_ReorderPositions){0, 0, 0, 0};
+    }
+  }
+  
+  return reorderPositions;
+}
+
+// Transitions an inventory from before to after or vice versa
+// depending on direction. The resulting inventory is returned
+// via the resultInventory argument (call-by-reference).
+void REW_reorderInventory(u16* inventory, u16* resultInventory, struct REW_ReorderPositions reorderPositions, bool direction) {
+  u8 inventorySlotAvailabilityMask = 0;
   int i, j, k, l;
   
-  inventoryReorder = (struct REW_InventoryReorder*)entry->data;
-  inventoryReorderFlags = (struct REW_InventoryReorderFlags*)&entry->flags;
-  
-  // Sanity checks. These values will not be accepted.
-  if (inventoryReorderFlags->item1Pos > 4 ||
-      inventoryReorderFlags->item3Pos > 2)
-    return;
-  
-  // Find unit.
-  unitID = gBmMapUnit[inventoryReorder->y][inventoryReorder->x];
-  unit = GetUnit(unitID);
-  if (!UNIT_IS_VALID(unit))
-    return;
-  
   // Prepare item location array.
-  int itemPositions[UNIT_ITEM_COUNT] = {inventoryReorderFlags->item1Pos,
-                                        inventoryReorderFlags->item2Pos,
-                                        inventoryReorderFlags->item3Pos,
-                                        inventoryReorderFlags->item4Pos,
+  int itemPositions[UNIT_ITEM_COUNT] = {reorderPositions.item1Pos,
+                                        reorderPositions.item2Pos,
+                                        reorderPositions.item3Pos,
+                                        reorderPositions.item4Pos,
                                         0};
   
   // Determine new positions of items.
   for (l = 0; l < UNIT_ITEM_COUNT; l++) {
   
-    // Item l.
+    // Hard to document how this exactly works.
     i = 0;
     j = itemPositions[l];
     k = 1;
@@ -56,15 +100,43 @@ void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo) {
     
     inventorySlotAvailabilityMask |= k;
     
-    if (undo)
-      items[l] = unit->items[i];
-    else // Redo.
-      items[i] = unit->items[l];
+    if (direction == REW_REORDER_PAST)
+      resultInventory[l] = inventory[i];
+    else // REW_REORDER_FUTURE.
+      resultInventory[i] = inventory[l];
   }
+}
+
+// Undo or redo a reordering of a unit's inventory.
+// bool undo is true if undoing the reorder, false if redoing the reorder.
+void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo) {
+  struct REW_InventoryReorder* inventoryReorder;
+  struct REW_ReorderPositions* reorderPositions;
+  s8 unitID;
+  struct Unit* unit;
+  u16 items[UNIT_ITEM_COUNT];
+  int i;
+  
+  inventoryReorder = (struct REW_InventoryReorder*)entry->data;
+  reorderPositions = (struct REW_ReorderPositions*)&entry->flags;
+  
+  // Sanity checks. These values will not be accepted.
+  if (reorderPositions->item1Pos > 4 ||
+      reorderPositions->item3Pos > 2)
+    return;
+  
+  // Find unit.
+  unitID = gBmMapUnit[inventoryReorder->y][inventoryReorder->x];
+  unit = GetUnit(unitID);
+  if (!UNIT_IS_VALID(unit))
+    return;
+  
+  // Generate unit's new inventory.
+  REW_reorderInventory(unit->items, items, *reorderPositions, undo);
   
   // Reorder unit's inventory.
-  for (l = 0; l < UNIT_ITEM_COUNT; l++)
-    unit->items[l] = items[l];
+  for (i = 0; i < UNIT_ITEM_COUNT; i++)
+    unit->items[i] = items[i];
 }
 
 // Undo unit obtaining an item.
@@ -275,7 +347,12 @@ void REW_redoUnitSupplyExchange(struct REW_RewindEntry* entry) {
 void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   struct REW_RewindEntry* entry;
   struct REW_InventoryReorder* inventoryReorder;
-  struct REW_InventoryReorderFlags* inventoryReorderFlags;
+  struct REW_ReorderPositions* reorderPositions;
+  struct REW_UnitMove* unitMove;
+  int i;
+  u16 itemsFuture[UNIT_ITEM_COUNT];
+  u16 itemsPast[UNIT_ITEM_COUNT];
+  u8 x, y;
   
   // Nothing to reorder.
   if (itemSlot <= 0)
@@ -289,12 +366,68 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   if (GetUnit(unit->index) != unit)
     return;
   
-  // Create new RewindEntry for REW_CONSEQ_INVENTORYREORDER.
+  // If possible, merge inventoryReorder into existing preceding
+  // REW_CONSEQ_INVENTORYREORDER instead of creating a new one.
+  x = unit->xPos;
+  y = unit->yPos;
+  entry = REW_lastEntry(REW_curSequence);
+  while (entry != NULL) {
+    
+    // We can iterate over unitMoves, but we have to
+    // track how the unit's coordinates change.
+    if (entry->diffType == REW_CONSEQ_UNITMOVE) {
+      
+      unitMove = (struct REW_UnitMove*)entry->data;
+      if (unitMove->xAfter == x && unitMove->yAfter == y) {
+        x = unitMove->xBefore;
+        y = unitMove->yBefore;
+      }
+    
+    // If the previous entry is an REW_CONSEQ_INVENTORYREORDER
+    // of the same unit, merge changes.
+    } else if (entry->diffType == REW_CONSEQ_INVENTORYREORDER) {
+      inventoryReorder = (struct REW_InventoryReorder*)entry->data;
+      reorderPositions = (struct REW_ReorderPositions*)&entry->flags;
+      
+      if (inventoryReorder->x == x && inventoryReorder->y == y) {
+        
+        // Create what will be the new inventory setup
+        // when item gets equipped.
+        itemsFuture[0] = unit->items[itemSlot];
+        for (i = 1; i < UNIT_ITEM_COUNT; i++) {
+          
+          if (i <= itemSlot)
+            itemsFuture[i] = unit->items[i - 1];
+          else
+            itemsFuture[i] = unit->items[i];
+        
+        }
+        
+        // Create past inventory-order.
+        REW_reorderInventory(unit->items, itemsPast, reorderPositions[0], REW_REORDER_PAST);
+        
+        // Create new reorderTransitionMatrix based on past and future inventory-orders.
+        reorderPositions[0] = REW_createReorderPositions(itemsPast, itemsFuture);
+        
+        // Now that we've merged the inventoryReorders, we're done.
+        return;
+      }
+    
+    // If we find any other diffType, give up on merging.
+    } else {
+      break;
+    }
+    
+    entry = REW_prevEntry(REW_curSequence, entry);
+  }
+  
+  // No option to merge, so
+  // create new RewindEntry for REW_CONSEQ_INVENTORYREORDER.
   entry = REW_mallocNewRewindEntry(REW_ENTRY_INVENTORYREORDER_SIZE);
   if (entry == NULL)
     return;
   entry->diffType = REW_CONSEQ_INVENTORYREORDER;
-  inventoryReorderFlags = (struct REW_InventoryReorderFlags*)&entry->flags;
+  reorderPositions = (struct REW_ReorderPositions*)&entry->flags;
   inventoryReorder = (struct REW_InventoryReorder*)entry->data;
   
   // Track unit's X and Y.
@@ -302,22 +435,22 @@ void REW_conseqEquipItem(struct Unit* unit, int itemSlot) {
   inventoryReorder->y = unit->yPos;
   
   // Setup default inventory order.
-  inventoryReorderFlags->item1Pos = 1;      // This item is guaranteed to have moved one down.
-  inventoryReorderFlags->item2Pos = 0;
-  inventoryReorderFlags->item3Pos = 0;
-  inventoryReorderFlags->item4Pos = 0;
+  reorderPositions->item1Pos = 1;       // This item is guaranteed to have moved one down.
+  reorderPositions->item2Pos = 0;
+  reorderPositions->item3Pos = 0;
+  reorderPositions->item4Pos = 0;
   
   // Second item location.
   if (itemSlot > 1)
-    inventoryReorderFlags->item2Pos = 1;
+    reorderPositions->item2Pos = 1;
   
   // Third item location.
   if (itemSlot > 2)
-    inventoryReorderFlags->item3Pos = 1;
+    reorderPositions->item3Pos = 1;
   
   // Fourth item location.
   if (itemSlot > 3)
-    inventoryReorderFlags->item4Pos = 1;
+    reorderPositions->item4Pos = 1;
   
   // Align rewindEntry.
   REW_alignEntry();
@@ -503,6 +636,23 @@ void REW_conseqSupplyTrackInventoryChanges(struct Unit* unit, u16* snapshotPtr) 
   }
   if (!didInventoryChange)
     return;
+  
+  // If last rewindEntry is a REW_CONSEQ_UNITSUPPLYEXCHANGE
+  // change itemsAfter of that rewindEntry instead
+  // of creating another REW_CONSEQ_UNITSUPPLYEXCHANGE rewindEntry.
+  if (!(REW_isSequenceEmpty(REW_curSequence))) {
+    entry = REW_lastEntry(REW_curSequence);
+    
+    if (entry->diffType == REW_CONSEQ_UNITSUPPLYEXCHANGE) {
+      
+      unitSupplyExchange = (struct REW_UnitSupplyExchange*)entry->data;
+    
+      for (i = 0; i < UNIT_ITEM_COUNT; i++)
+        unitSupplyExchange->itemsAfter[i] = unit->items[i];
+      
+      return;
+    }
+  }
   
   // Create new RewindEntry for REW_CONSEQ_UNITSUPPLYEXCHANGE.
   entry = REW_mallocNewRewindEntry(REW_CONSEQ_UNITSUPPLYEXCHANGE_SIZE);

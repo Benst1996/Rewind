@@ -147,6 +147,7 @@ struct REW_RewindSequence* REW_prevSequence(struct REW_RewindSequence* sequence)
 struct REW_RewindEntry* REW_nextEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_prevEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry);
 struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq);
+struct REW_RewindEntry* REW_findEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, u8 diffType);
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence);
 int REW_isRedoAvailable(struct REW_RewindSequence* sequence);

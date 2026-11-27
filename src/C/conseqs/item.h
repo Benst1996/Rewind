@@ -15,6 +15,10 @@ enum {
   
   REW_CONSEQ_UNITSUPPLYEXCHANGE_SIZE = UNIT_ITEM_COUNT * 2 * 2,
   
+  // Reordering inventory.
+  REW_REORDER_FUTURE = false,
+  REW_REORDER_PAST = true,
+  
 };
 
 // Rewind entry data.
@@ -45,7 +49,7 @@ struct REW_UnitSupplyExchange {
 };
 
 // rewindEntry flags for an REW_InventoryReorder
-struct REW_InventoryReorderFlags {
+struct REW_ReorderPositions {
   /* 00 */ u8 item1Pos : 3;
   /* 00 */ u8 item2Pos : 2;
   /* 00 */ u8 item3Pos : 2;
@@ -53,6 +57,8 @@ struct REW_InventoryReorderFlags {
   // item5Pos can be inferred.
 };
 
+struct REW_ReorderPositions REW_createReorderPositions(u16* inventoryBefore, u16* inventoryAfter);
+void REW_reorderInventory(u16* inventory, u16* resultInventory, struct REW_ReorderPositions reorderPositions, bool direction);
 void REW_doInventoryReorder(struct REW_RewindEntry* entry, bool undo);
 void REW_undoItemObtainedUnit(struct REW_RewindEntry* entry);
 void REW_undoItemRemovedUnit(struct REW_RewindEntry* entry);

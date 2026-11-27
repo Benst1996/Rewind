@@ -1,9 +1,10 @@
+.thumb
+
 @ Track whenever a unit opens a chest.
 @ registers:
 @   r0: holds itemSlot of item used to open chest.
 @
 @ Hooked at 0x23E6C ChestCommandEffect.
-.thumb
 .global REW_hookOpenChest
 REW_hookOpenChest:
 

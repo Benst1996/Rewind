@@ -43,6 +43,10 @@ PUSH
   // Track whenever a unit opens a chest.
   ORG 0x23E6C
     jumpToHack(REW_hookOpenChest)
+  
+  // Track whenever a unit waits.
+  ORG 0x18740
+    jumpToHack(REW_hookWait)
 
 POP
 
@@ -51,3 +55,4 @@ ALIGN 4; REW_actionHookCombat:
 ALIGN 4; REW_actionHookPhaseChangeStart:
 #include "phaseChange.lyn.event"
 ALIGN 4; #include "unlock.lyn.event"
+ALIGN 4; #include "wait.lyn.event"

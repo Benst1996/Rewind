@@ -40,19 +40,26 @@ void REW_deleteRewindEntry(struct REW_RewindSequence* seq, struct REW_RewindEntr
     entryIt = REW_nextEntry(seq, entryIt);
   }
   
-  // If we find no entries past the
-  // unitMove rewindEntry, then nothing to refactor.
-  if (it <= 0)
-    return;
-  
-  // Copy buffer to rewindSequence.
-  CpuCopy32(&newSequenceTail[0], (void*)entry, it);
-  
   // Adjust rewindSequence buffer size.
   align = entrySize & 3;
   if (align)
     entrySize += 4 - align;
   seq->size -= entrySize;
+  
+  // If we deleted the sequence's only rewindEntry,
+  // properly clear/empty the sequence.
+  if (seq->size == REW_SEQUENCE_BASESIZE) {
+    REW_clearRewindSeq(seq);
+    return;
+  }
+  
+  // If we find no entries past the
+  // deleted rewindEntry, then nothing to refactor.
+  if (it <= 0)
+    return;
+  
+  // Copy buffer to rewindSequence.
+  CpuCopy32(&newSequenceTail[0], (void*)entry, it);
 }
 
 // Adds a new rewindEntry to the rewindSequence, REW_curSequence.
@@ -202,9 +209,14 @@ struct REW_RewindEntry* REW_prevEntry(struct REW_RewindSequence* seq, struct REW
 }
 
 // Given a rewind-sequence, return the last entry of the sequence.
+// Returns NULL if the sequence is empty.
 struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq) {
   struct REW_RewindEntry* prev = seq->entry;
   struct REW_RewindEntry* cur = seq->entry;
+  
+  // if the sequence is empty, we return NULL.
+  if (REW_isSequenceEmpty(seq))
+    return NULL;
   
   // Find final entry.
   while (cur != NULL) {
@@ -214,6 +226,33 @@ struct REW_RewindEntry* REW_lastEntry(struct REW_RewindSequence* seq) {
   
   // Return final entry.
   return prev;
+}
+
+// Searches for a rewindEntry with the given diffType in the given rewindSequence.
+// args:
+//  - seq: rewindSequence to search through.
+//  - entry: first entry in the sequence to search from onwards.
+//  - diffType: diffType of entry we're searching.
+// Returns first matching entry found or NULL if no such entry is in the sequence.
+struct REW_RewindEntry* REW_findEntry(struct REW_RewindSequence* seq, struct REW_RewindEntry* entry, u8 diffType) {
+  
+  // If the sequence is empty, then entry not found.
+  if (REW_isSequenceEmpty(seq))
+    return NULL;
+  
+  // Iterate over sequence's rewindEntries.
+  while (entry != NULL) {
+    
+    // If diffType matches, return this entry.
+    if (entry->diffType == diffType)
+      return entry;
+    
+    // Otherwise iterate.
+    entry = REW_nextEntry(seq, entry);
+  }
+  
+  // Couldn't find entry of given diffType in given sequence past given entry.
+  return NULL;
 }
 
 int REW_isUndoAvailable(struct REW_RewindSequence* sequence) {

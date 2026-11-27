@@ -64,3 +64,36 @@ ldr   r1, [r4]
 @ Return.
 ldr   r0, =0x801D011
 bx    r0
+
+
+@ We track whenever a unit moves in other phases.
+@
+@ Hooked at 0x39C24, AiSetDecision
+.global REW_hookOtherPhaseUnitMove
+REW_hookOtherPhaseUnitMove:
+
+@ Vanilla, overwritten by hook.
+mov   r5, r8
+push  {r5, r6}
+ldr   r6, [sp, #0x18]
+ldr   r4, [sp, #0x1C]
+
+@ Preserve scratch registers.
+push  {r0-r3}
+
+@ Determine args to REW_conseqUnitMove.
+mov   r2, r0                @ xAfter.
+mov   r3, r1                @ yAfter.
+ldr   r5, =gActiveUnit
+ldr   r5, [r5]
+ldrb  r0, [r5, #0x10]       @ xBefore.
+ldrb  r1, [r5, #0x11]       @ yBefore.
+
+@ Call REW_conseqUnitMove
+ldr   r5, =REW_conseqUnitMove
+bl    GOTO_R5
+
+@ Return.
+pop   {r0-r3}
+ldr   r5, =0x8039C2D
+bx    r5
